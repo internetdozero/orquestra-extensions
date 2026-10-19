@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Stable console entry point for the cloudflare-mcp stdio server.
+#
+# The server runs from an isolated virtualenv under
+# ~/.local/share/cloudflare-mcp/runtime so its dependencies can never collide
+# with the system Python. This shim resolves that runtime, prefers its installed
+# console script and falls back to `python -m cloudflare_mcp`.
+set -euo pipefail
+
+runtime="${CLOUDFLARE_MCP_RUNTIME:-$HOME/.local/share/cloudflare-mcp/runtime}"
+
+if [[ ! -d "$runtime" ]]; then
+  echo "cloudflare-mcp: runtime not found at $runtime" >&2
+  echo "create it with: python3 -m venv \"$runtime\" && \"$runtime/bin/pip\" install cloudflare-mcp" >&2
+  exit 78
+fi
+
+runner="$runtime/bin/cloudflare-mcp"
+if [[ -x "$runner" ]]; then
+  exec "$runner" "$@"
+fi
+
+exec "$runtime/bin/python" -m cloudflare_mcp "$@"

@@ -1,0 +1,157 @@
+"""MCP entrypoint: registers the idea-vault tools and runs the transport."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from typing import Any
+
+from mcp.server.mcpserver import MCPServer
+
+from . import blackboard, ideas
+from .store import ENV_DB_PATH, configure, get_database
+
+INSTRUCTIONS = """Local idea vault and inter-agent blackboard backed by one SQLite file.
+
+Use the idea tools to capture thoughts without leaving the terminal, and the
+board tools to leave asynchronous notes for other agents working concurrently:
+post with post_board_note, then read_board_notes with unread_only to pick up
+what is waiting for you. Call read_board_notes(mark_as_read=True) once handled.
+"""
+
+server = MCPServer(
+    name="idea-vault",
+    title="Idea Vault",
+    version="0.1.0",
+    instructions=INSTRUCTIONS,
+)
+
+
+@server.tool(
+    description="Capture a new idea in the local vault. Returns the stored idea with its id."
+)
+def record_idea(
+    project: str,
+    title: str,
+    description: str = "",
+    category: str = "feature",
+    priority: str = "medium",
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    """Record an idea. category: feature|architecture|bug|ux|idea, priority: low|medium|high|critical."""
+    with get_database() as conn:
+        return ideas.record_idea(
+            conn, project, title, description, category, priority, tags
+        )
+
+
+@server.tool(
+    description="List ideas filtered by project, status (default open), category and priority."
+)
+def list_ideas(
+    project: str | None = None,
+    status: str = "open",
+    category: str | None = None,
+    priority: str | None = None,
+) -> dict[str, Any]:
+    """List ideas. status: open|in_progress|completed|archived|all."""
+    with get_database() as conn:
+        return ideas.list_ideas(conn, project, status, category, priority)
+
+
+@server.tool(
+    description="Search ideas by title, description or tags (case-insensitive substring match)."
+)
+def search_ideas(query: str, project: str | None = None) -> dict[str, Any]:
+    """Search the vault, optionally scoped to one project."""
+    with get_database() as conn:
+        return ideas.search_ideas(conn, query, project)
+
+
+@server.tool(
+    description="Transition an idea to open, in_progress, completed or archived."
+)
+def update_idea_status(idea_id: int, status: str) -> dict[str, Any]:
+    """Update an idea's status by id."""
+    with get_database() as conn:
+        return ideas.update_idea_status(conn, idea_id, status)
+
+
+@server.tool(
+    description="Export one project's open and in-progress ideas as grouped GitHub-style markdown."
+)
+def export_ideas_markdown(project: str) -> dict[str, Any]:
+    """Return markdown grouped by category, ready to paste into a README or issue."""
+    with get_database() as conn:
+        return ideas.export_ideas_markdown(conn, project)
+
+
+@server.tool(
+    description="Post an asynchronous note to the shared blackboard for other agents."
+)
+def post_board_note(
+    project: str,
+    topic: str,
+    note: str,
+    sender: str = "agent",
+    target: str = "all",
+) -> dict[str, Any]:
+    """Append a collaboration note. topic: backend|frontend|contract|general or any label."""
+    with get_database() as conn:
+        return blackboard.post_board_note(conn, project, topic, note, sender, target)
+
+
+@server.tool(
+    description="Read blackboard notes for a project, unread only by default, optionally marking them read."
+)
+def read_board_notes(
+    project: str,
+    topic: str | None = None,
+    unread_only: bool = True,
+    mark_as_read: bool = False,
+    target: str | None = None,
+) -> dict[str, Any]:
+    """Fetch collaboration notes addressed to you or to all agents."""
+    with get_database() as conn:
+        return blackboard.read_board_notes(
+            conn, project, topic, unread_only, mark_as_read, target
+        )
+
+
+@server.tool(
+    description="Delete handled blackboard notes: read notes only by default, or every note with include_unread."
+)
+def clear_board_notes(
+    project: str,
+    topic: str | None = None,
+    include_unread: bool = False,
+) -> dict[str, Any]:
+    """Clean up resolved notes for a project, optionally scoped to one topic."""
+    with get_database() as conn:
+        return blackboard.clear_board_notes(conn, project, topic, include_unread)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Parse arguments, open the vault and serve MCP over the chosen transport."""
+    parser = argparse.ArgumentParser(prog="idea-vault", description=__doc__)
+    parser.add_argument(
+        "--db", default=None, help=f"SQLite database path (env: {ENV_DB_PATH})"
+    )
+    parser.add_argument(
+        "--transport",
+        default="stdio",
+        choices=("stdio", "sse", "streamable-http"),
+        help="MCP transport (default: stdio)",
+    )
+    args = parser.parse_args(argv)
+    path = configure(args.db)
+    database = get_database()
+    with database as conn:
+        conn.execute("SELECT 1")
+    print(f"idea-vault: serving {path}", file=sys.stderr)
+    server.run(args.transport)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,342 @@
+[
+  {
+    "id": "d1-intro",
+    "title": "D1 serverless SQLite database basics",
+    "product": "d1",
+    "tags": ["d1", "sqlite", "database", "sql", "serverless", "binding"],
+    "snippet": "D1 is Cloudflare's serverless SQLite database. Each database has a UUID used in account scoped endpoints; name queries resolve the UUID first. Bind it to a Worker as a d1_databases binding to use env.DB.",
+    "summary": "Create, identify and query a D1 database through REST or a Worker binding.",
+    "code": "wrangler d1 create my-db\ncurl -H \"Authorization: Bearer $CLOUDFLARE_API_TOKEN\" \\\n  \"https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/d1/database\"\n\n# wrangler.toml\n[[d1_databases]]\nbinding = \"DB\"\ndatabase_name = \"my-db\"\ndatabase_id = \"<uuid>\"",
+    "url": "https://developers.cloudflare.com/d1/"
+  },
+  {
+    "id": "d1-rest-query",
+    "title": "Execute SQL over the D1 REST API",
+    "product": "d1",
+    "tags": ["d1", "sql", "query", "rest", "rows_read", "params"],
+    "snippet": "POST /accounts/{account_id}/d1/database/{database_id}/query with {sql, params, timeout} returns per-statement results, changes, rows_read and duration in meta. SELECT rows land in results.",
+    "summary": "Run parameterized SQL statements and read changes/duration metadata.",
+    "code": "POST /accounts/{account_id}/d1/database/{db}/query\nBody: {\"sql\":\"SELECT * FROM users WHERE id = ?\",\"params\":[\"u_1\"],\"timeout\":30000}\nResponse result[0] = {\"results\":[{...}],\"changes\":1,\"success\":true,\n  \"meta\":{\"rows_read\":3,\"rows_written\":0,\"duration\":1.4,\"last_row_id\":2}}",
+    "url": "https://developers.cloudflare.com/api/resources/d1/subresources/statements/methods/create/"
+  },
+  {
+    "id": "d1-migrations",
+    "title": "D1 schema migrations with wrangler",
+    "product": "d1",
+    "tags": ["d1", "migration", "schema", "ddl", "wrangler", "migrations"],
+    "snippet": "Keep schema changes in migration files: D1 supports a maximum of 100 migration files and 5 consecutive pending migrations per session. Apply with --remote against production.",
+    "summary": "Apply DDL migrations non-interactively and keep them versioned.",
+    "code": "mkdir -p migrations\ncat > migrations/0001_init.sql <<'SQL'\nCREATE TABLE users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL);\nSQL\nwrangler d1 migrations apply my-db --remote\nwrangler d1 migrations list my-db --remote",
+    "url": "https://developers.cloudflare.com/d1/platform/migrations/"
+  },
+  {
+    "id": "d1-pitfalls",
+    "title": "D1 query limits, batches and pitfalls",
+    "product": "d1",
+    "tags": ["d1", "batch", "limit", "parameters", "like", "joins", "extension"],
+    "snippet": "D1 rejects CREATE DATABASE and extension SQL like pragma/ATTACH; parameter binding cannot appear in the column list of an index, or in LEFT JOIN's right-hand ON clause; LIKE is case-insensitive (PRAGMA case_sensitive_like).",
+    "summary": "Common D1 restrictions to check before sending SQL.",
+    "code": "POST /accounts/{account_id}/d1/database/{db}/query\nBody: {\"sql\":\"BEGIN; UPDATE accounts SET cnt = cnt + 1; COMMIT;\"}\n\n# Unsupported: ATTACH DATABASE, CREATE EXTENSION, REPLICA IDENTITY",
+    "url": "https://developers.cloudflare.com/d1/platform/sql-limits/"
+  },
+  {
+    "id": "workers-intro",
+    "title": "Cloudflare Workers deployment and environments",
+    "product": "workers",
+    "tags": ["worker", "deploy", "environments", "production", "preview", "wrangler"],
+    "snippet": "Workers deploy to production and optional preview environments. List scripts via GET /accounts/{id}/workers/scripts, deployments via /deployments, and routes via /workers/routes.",
+    "summary": "Deploy a Worker, then inspect its environments and rollout history.",
+    "code": "npx wrangler deploy\nnpx wrangler versions upload\ncurl -H \"Authorization: Bearer $TOKEN\" \\\n  \"https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts\"\ncurl -H \"Authorization: Bearer $TOKEN\" \\\n  \"https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/scripts/my-worker/deployments\"",
+    "url": "https://developers.cloudflare.com/workers/"
+  },
+  {
+    "id": "workers-config",
+    "title": "wrangler.toml configuration reference",
+    "product": "workers",
+    "tags": ["wrangler", "config", "toml", "compatibility_date", "vars", "main"],
+    "snippet": "The Worker config declares main, compatibility_date, vars, bindings and routes. compatibility_date pins the runtime behaviour; changing it can alter Worker semantics.",
+    "summary": "Minimal, valid wrangler configuration for a router Worker.",
+    "code": "name = \"my-worker\"\nmain = \"src/index.ts\"\ncompatibility_date = \"2025-01-01\"\nworkers_dev = true\n\n[vars]\nENV = \"production\"\n\n[[routes]]\npattern = \"example.com/*\"\nzoned_name = \"example.com\"\n\n[[kv_namespaces]]\nbinding = \"CACHE\"\nid = \"<namespace_id>\"",
+    "url": "https://developers.cloudflare.com/workers/wrangler/configuration/"
+  },
+  {
+    "id": "workers-secrets",
+    "title": "Secrets and environment variables in Workers",
+    "product": "workers",
+    "tags": ["secrets", "secret", "environment", "vars", "encrypt", "wrangler"],
+    "snippet": "Secrets are encrypted and environment scoped. Put them in .dev.vars (gitignored) and set them with wrangler secret put NAME; plain vars live in wrangler.toml [vars] or per environment.",
+    "summary": "Store and roll API tokens as Worker secrets rather than in code.",
+    "code": "echo -n \"$CLOUDFLARE_API_TOKEN\" | npx wrangler secret put CLOUDFLARE_API_TOKEN\nnpx wrangler secret list\nnpx wrangler secret delete CLOUDFLARE_API_TOKEN\n\n# local only\necho \"CLOUDFLARE_API_TOKEN=dev_token\" >> .dev.vars",
+    "url": "https://developers.cloudflare.com/workers/configuration/secrets/"
+  },
+  {
+    "id": "workers-routes",
+    "title": "Workers routes and zone routing",
+    "product": "workers",
+    "tags": ["routes", "pattern", "zone", "dns", "proxy", "route"],
+    "snippet": "Account level routes (GET/POST /accounts/{id}/workers/routes) map a pattern to a script without touching zone config; zone scoped routes live on /zones/{zone_id}/workers/routes.",
+    "summary": "Attach route patterns to a Worker and manage them via API.",
+    "code": "POST /accounts/{account_id}/workers/routes\n{\"pattern\":\"example.com/api/*\",\"script\":\"my-worker\"}\n\n# equivalent wrangler.toml\n[[routes]]\npattern = \"example.com/api/*\"\nzoned_name = \"example.com\"",
+    "url": "https://developers.cloudflare.com/workers/configuration/routing/"
+  },
+  {
+    "id": "workers-bindings",
+    "title": "Worker bindings: KV, D1, R2, secrets, queues",
+    "product": "workers",
+    "tags": ["binding", "kv", "d1", "r2", "queue", "service", "env"],
+    "snippet": "Bindings inject typed clients onto env: KV (env.CACHE), D1 (env.DB), R2 (env.BUCKET), Durable Objects, queues, services and AI. Binding names must be unique per Worker.",
+    "summary": "Declare storage and service bindings so Worker code receives env objects.",
+    "code": "export interface Env { DB: D1Database; CACHE: KVNamespace; BUCKET: R2Bucket }\nexport default {\n  async fetch(req: Request, env: Env): Promise<Response> {\n    const row = await env.DB.prepare('SELECT 1 AS ok').first();\n    await env.CACHE.put('last', new Date().toISOString());\n    return Response.json(row);\n  }\n};",
+    "url": "https://developers.cloudflare.com/workers/runtime-apis/bindings/"
+  },
+  {
+    "id": "workers-cron",
+    "title": "Cron triggers and scheduled handlers",
+    "product": "workers",
+    "tags": ["cron", "trigger", "scheduled", "schedule", "crontab"],
+    "snippet": "Cron triggers run the scheduled handler on an UTC schedule via [triggers] crons. Supports regular cron expressions (5 field) plus seconds via the six-field form on paid plans.",
+    "summary": "Run periodic maintenance work inside a Worker on a schedule.",
+    "code": "[[triggers]]\ncrons = [\"*/5 * * * *\"]\n\nexport default {\n  async scheduled(event: ScheduledEvent, env: Env): Promise<void> {\n    await env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?')\n      .bind(Date.now()).run();\n  }\n};",
+    "url": "https://developers.cloudflare.com/workers/configuration/triggers/"
+  },
+  {
+    "id": "workers-tail",
+    "title": "Live Worker logs with wrangler tail",
+    "product": "workers",
+    "tags": ["tail", "logs", "observability", "debug", "console", "filter"],
+    "snippet": "wrangler tail streams console.log, exceptions and fetch events for a deployed Worker in real time; --format json gives machine readable events, --filter restricts by level or header.",
+    "summary": "Watch production Worker logs without a debug build.",
+    "code": "npx wrangler tail my-worker --format json --duration 30\nnpx wrangler tail my-worker --format json --filter \"(event = fetch)\"\nnpx wrangler tail my-worker --format json --filter \"(log.level = error)\"",
+    "url": "https://developers.cloudflare.com/workers/observability/logs/workers-logs/"
+  },
+  {
+    "id": "workers-limit",
+    "title": "Workers limits (CPU, memory, size)",
+    "product": "workers",
+    "tags": ["limits", "quota", "cpu", "memory", "size", "plan"],
+    "snippet": "Workers free plan: 10ms CPU per request, 128MB memory, ~1MB compressed script (10MB paid). Popularity limits are enforced on requests per minute at the edge.",
+    "summary": "Check platform limits before profiling a slow or rejected deploy.",
+    "code": "# number of Workers routes may be limited by plan\nwrangler whoami\nwrangler deployments list --name my-worker",
+    "url": "https://developers.cloudflare.com/workers/platform/limits/"
+  },
+  {
+    "id": "kv-intro",
+    "title": "Workers KV namespaces and key-value ops",
+    "product": "kv",
+    "tags": ["kv", "namespace", "key", "value", "binding", "eventual"],
+    "snippet": "KV is a replicated key-value store: 1 KiB max key, 25 MiB max value, 512 KiB per metadata; writes are eventually consistent (up to 60s propagation).",
+    "summary": "Create a namespace and read/write keys via API or binding.",
+    "code": "npx wrangler kv namespace create CACHE\n\n# REST\ncurl -X PUT -H \"Authorization: Bearer $TOKEN\" \\\n  --data-binary @value.txt \\\n  \"https://api.cloudflare.com/client/v4/accounts/$ID/storage/kv/namespaces/$NS/values/my-key\"\n\nawait env.CACHE.put('my-key', 'value', { expirationTtl: 60 });",
+    "url": "https://developers.cloudflare.com/kv/"
+  },
+  {
+    "id": "kv-api",
+    "title": "KV REST endpoints: write key with TTL and metadata",
+    "product": "kv",
+    "tags": ["kv", "ttl", "expiration", "metadata", "put", "get", "write"],
+    "snippet": "PUT a value with query expiration_ttl (seconds, min 60) and metadata (JSON, max 1024 bytes). GET /values/{key} returns the body; GET /metadata/{key} returns attached metadata.",
+    "summary": "Set keys with expiry and JSON metadata through the REST API.",
+    "code": "PUT /accounts/{account_id}/storage/kv/namespaces/{ns_id}/values/{key}?expiration_ttl=60&metadata=%7B%22v%22%3A1%7D\nContent-Type: text/plain\nBody: value\n\nGET /accounts/{account_id}/storage/kv/namespaces/{ns_id}/metadata/{key}",
+    "url": "https://developers.cloudflare.com/api/resources/kv/subresources/namespaces/subresources/values/methods/update/"
+  },
+  {
+    "id": "kv-limits",
+    "title": "KV quotas and request limits",
+    "product": "kv",
+    "tags": ["kv", "limits", "quota", "writes", "rate", "list"],
+    "snippet": "KV limits: 1 key/value pair per request, key list max 1000 keys, 1000 write ops/sec per account, 1 write per key per second. Lists are lexicographic with cursor pagination.",
+    "summary": "Where KV is and is not appropriate; batching strategy.",
+    "code": "GET /accounts/{account_id}/storage/kv/namespaces/{ns_id}/keys?prefix=u_&limit=100&cursor=...",
+    "url": "https://developers.cloudflare.com/kv/platform/limits/"
+  },
+  {
+    "id": "r2-intro",
+    "title": "R2 object storage buckets",
+    "product": "r2",
+    "tags": ["r2", "bucket", "object", "storage", "s3", "zero-egress"],
+    "snippet": "R2 is S3-compatible object storage with zero egress fees. Bucket operations live under /accounts/{id}/r2/buckets; object reads/writes go to the R2 data plane endpoint.",
+    "summary": "Create buckets and operate on objects without S3 gateway costs.",
+    "code": "npx wrangler r2 bucket create assets\n\ncurl -H \"Authorization: Bearer $TOKEN\" \\\n  \"https://api.cloudflare.com/client/v4/accounts/$ID/r2/buckets\"\n\nexport interface Env { BUCKET: R2Bucket }\nawait env.BUCKET.put('uploads/a.png', request.body);",
+    "url": "https://developers.cloudflare.com/r2/"
+  },
+  {
+    "id": "r2-objects",
+    "title": "R2 object listing and writes",
+    "product": "r2",
+    "tags": ["r2", "objects", "list", "prefix", "cursor", "truncated", "etags"],
+    "snippet": "POST /accounts/{id}/r2/buckets/{bucket}/objects/list with prefix, limit and cursor returns objects plus a truncated flag and cursor for the next page.",
+    "summary": "Page through object keys in a bucket using prefix and cursor.",
+    "code": "POST /accounts/{account_id}/r2/buckets/{bucket}/objects/list\nBody: {\"prefix\":\"uploads/\",\"limit\":100,\"cursor\":\"...\"}\nResponse: {\"objects\":[{\"key\",\"size\",\"uploaded\",\"etag\"}],\"truncated\":true,\"cursor\":\"...\"}",
+    "url": "https://developers.cloudflare.com/api/resources/r2/subresources/buckets/subresources/objects/methods/list/"
+  },
+  {
+    "id": "r2-presigned",
+    "title": "Presigned URLs for R2",
+    "product": "r2",
+    "tags": ["r2", "presigned", "url", "s3", "temporary", "upload"],
+    "snippet": "R2 issues presigned S3 URLs through an S3 client with R2 credentials (Account ID, Access Key, Secret Key). Presign PUT for uploads, GET for private downloads.",
+    "summary": "Hand a browser a time-limited upload/download URL without proxying bytes.",
+    "code": "import { S3Client } from '@aws-sdk/client-s3';\nimport { getSignedUrl } from '@aws-sdk/s3-request-presigner';\nconst r2 = new S3Client({ region: 'auto',\n  endpoint: `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`,\n  credentials: { accessKeyId: R2_KEY, secretAccessKey: R2_SECRET } });\nconst url = await getSignedUrl(r2, new PutObjectCommand({ Bucket: 'assets', Key: 'a.png' }), { expiresIn: 300 });",
+    "url": "https://developers.cloudflare.com/r2/api/s3/presigned-urls/"
+  },
+  {
+    "id": "dns-intro",
+    "title": "Zones and DNS records overview",
+    "product": "dns",
+    "tags": ["dns", "zone", "record", "domain", "nameservers"],
+    "snippet": "A zone is a domain on Cloudflare, resolvable by GET /zones?name=example.com. DNS records live under /zones/{zone_id}/dns_records with type, name, content, ttl and proxied flags.",
+    "summary": "Resolve a zone id, then list or mutate its DNS records.",
+    "code": "GET /zones?name=example.com\nGET /zones/{zone_id}/dns_records?type=A&name=api.example.com\nPOST /zones/{zone_id}/dns_records\n{\"type\":\"A\",\"name\":\"api.example.com\",\"content\":\"203.0.113.10\",\"ttl\":1,\"proxied\":true}",
+    "url": "https://developers.cloudflare.com/dns/"
+  },
+  {
+    "id": "dns-record-types",
+    "title": "DNS record types (A, AAAA, CNAME, TXT, MX, SRV, CAA)",
+    "product": "dns",
+    "tags": ["dns", "a", "aaaa", "cname", "txt", "mx", "srv", "caa", "record"],
+    "snippet": "A/AAAA map names to IPs, CNAME aliases another name (cannot coexist with other types at the same name), TXT holds verification strings, MX sets mail exchangers with priority, CAA restricts certificate issuers.",
+    "summary": "Pick the right record type before upserting content.",
+    "code": "{\"type\":\"CNAME\",\"name\":\"www\",\"content\":\"example.com\",\"ttl\":1,\"proxied\":true}\n{\"type\":\"TXT\",\"name\":\"_acme-challenge\",\"content\":\"token=xyz\",\"ttl\":300}\n{\"type\":\"MX\",\"name\":\"example.com\",\"content\":\"mail.example.com\",\"priority\":10,\"ttl\":1}",
+    "url": "https://developers.cloudflare.com/dns/manage-dns-records/reference/dns-records/"
+  },
+  {
+    "id": "dns-upsert",
+    "title": "Create or update a DNS record idempotently",
+    "product": "dns",
+    "tags": ["dns", "upsert", "patch", "create", "update", "proxied", "ttl"],
+    "snippet": "Fetch by type+name first: PATCH /zones/{zone_id}/dns_records/{record_id} when found, otherwise POST to the collection. ttl 1 means automatic; proxied is only valid for A, AAAA and CNAME.",
+    "summary": "Safe create-or-update flow by natural key (type + name).",
+    "code": "GET /zones/{zone_id}/dns_records?type=A&name=api.example.com\n# found -> PATCH /zones/{zone_id}/dns_records/{record_id}\n{\"content\":\"203.0.113.11\",\"ttl\":1,\"proxied\":true,\"comment\":\"managed by cloudflare-mcp\"}\n# missing -> POST /zones/{zone_id}/dns_records",
+    "url": "https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/create/"
+  },
+  {
+    "id": "dns-proxy",
+    "title": "Proxy status (orange cloud), TTL and caching",
+    "product": "dns",
+    "tags": ["dns", "proxy", "orange-cloud", "ttl", "cache", "cdn"],
+    "snippet": "proxied=true routes traffic through Cloudflare (CDN, WAF) and hides origin IPs; ttl=1 is automatic (120s default minimum with proxy on). TXT/MX and other types are DNS-only.",
+    "summary": "Decide whether a record should be proxied and which TTL to set.",
+    "code": "{\"type\":\"A\",\"name\":\"origin.example.com\",\"content\":\"203.0.113.10\",\"ttl\":1,\"proxied\":false}",
+    "url": "https://developers.cloudflare.com/dns/manage-dns-records/reference/proxied-records/"
+  },
+  {
+    "id": "tokens-intro",
+    "title": "Cloudflare API tokens and scopes",
+    "product": "api",
+    "tags": ["token", "auth", "scopes", "api", "bearer", "verify", "permissions"],
+    "snippet": "Create scoped API tokens (DNS:Edit, Account:Read...) instead of Global API Keys. Verify with GET /user/tokens/verify; send Authorization: Bearer on every request. Tokens are account secrets - never log them.",
+    "summary": "Least-privilege token setup and verification for this server.",
+    "code": "curl -H \"Authorization: Bearer $CLOUDFLARE_API_TOKEN\" \\\n  \"https://api.cloudflare.com/client/v4/user/tokens/verify\"\n# suggested grants for cloudflare-mcp:\n#   Account: D1, Workers KV, Workers Scripts, R2 - Read/Edit\n#   Zone: DNS:Read/Edit, Zone:Read",
+    "url": "https://developers.cloudflare.com/fundamentals/api/get-started/create-token/"
+  },
+  {
+    "id": "api-envelope",
+    "title": "v4 API response envelope and errors",
+    "product": "api",
+    "tags": ["api", "errors", "success", "messages", "status", "retries", "pagination"],
+    "snippet": "Every v4 response is {success, errors[], messages[], result, result_info}. Pagination uses page/per_page/result_info.has_more. Retry 429 with Retry-After, honour rate limits per token.",
+    "summary": "Parse Cloudflare responses and paginate list endpoints correctly.",
+    "code": "{\n  \"success\": true,\n  \"errors\": [{\"code\": 1000, \"message\": \"...\"}],\n  \"messages\": [],\n  \"result\": [...],\n  \"result_info\": {\"page\": 1, \"per_page\": 50, \"count\": 12, \"has_more\": true}\n}",
+    "url": "https://developers.cloudflare.com/api/resources/"
+  },
+  {
+    "id": "observability",
+    "title": "Workers observability, alarms and queries",
+    "product": "workers",
+    "tags": ["observability", "logs", "metrics", "tail", "query", "dashboard"],
+    "snippet": "Workers Logpush, Workers Observability and wrangler tail cover invocations, errors and CPU time. console.log is retained when observability enabled; tail gives immediate streaming.",
+    "summary": "Instrument and inspect Worker behaviour in production.",
+    "code": "observability = { enabled = true, head_sampling_rate = 1.0 }\n\n# wrangler.toml\n[observability]\nenabled = true",
+    "url": "https://developers.cloudflare.com/workers/observability/"
+  },
+  {
+    "id": "durable-objects",
+    "title": "Durable Objects: state, coordination, sqlSession",
+    "product": "durable-objects",
+    "tags": ["durable-objects", "state", "storage", "sqlite", "coordination"],
+    "snippet": "Durable Objects give a single-threaded instance with transactional storage (in-memory cache + SQLite persistence). Migrations declare the class with new_sqlite_classes for SQLite-backed storage.",
+    "summary": "Use a Durable Object when you need strongly consistent coordination.",
+    "code": "[[migrations]]\ntag = \"v1\"\nnew_sqlite_classes = [\"ChatRoom\"]\n\nexport class ChatRoom {\n  constructor(state: DurableObjectState) { this.state = state; }\n  async fetch(req: Request) {\n    const n = (await this.state.storage.get('count') ?? 0) + 1;\n    await this.state.storage.put('count', n);\n    return Response.json({ n });\n  }\n}",
+    "url": "https://developers.cloudflare.com/durable-objects/"
+  },
+  {
+    "id": "local-dev",
+    "title": "Local development with wrangler dev",
+    "product": "workers",
+    "tags": ["wrangler", "dev", "local", "miniflare", "mock", "dry-run"],
+    "snippet": "wrangler dev runs a local Miniflare instance (default local bindings) on port 8787; --remote targets real resources. Use --dry-run to validate config without deploying.",
+    "summary": "Validate Workers and bindings before touching production.",
+    "code": "npx wrangler dev --port 8787\nnpx wrangler dev --remote\nnpx wrangler deploy --dry-run\nnpx wrangler whoami",
+    "url": "https://developers.cloudflare.com/workers/get-started/local-development/"
+  },
+  {
+    "id": "mcp-patterns",
+    "title": "Tool-driven infrastructure automation patterns",
+    "product": "architecture",
+    "tags": ["mcp", "automation", "typed", "tools", "idempotent", "safety"],
+    "snippet": "Prefer typed tool calls with idempotent semantics (upsert by natural key) over shelling out to a CLI: responses are structured JSON, credentials stay server-side, and errors map to stable types (configuration, api, wrangler).",
+    "summary": "Guidance for composing multi-step Cloudflare changes safely.",
+    "code": "1. cf_system_status           -> verify auth + capabilities\n2. cf_d1_list_databases       -> resolve name to id\n3. cf_d1_query(..., params)   -> run parameterized SQL\n4. cf_d1_query('PRAGMA table_info(users)') -> inspect schema\n5. cf_dns_upsert(..., comment) -> idempotent record change",
+    "url": "https://developers.cloudflare.com/"
+  },
+  {
+    "id": "error-handling",
+    "title": "Diagnosing common Cloudflare API failures",
+    "product": "api",
+    "tags": ["errors", "diagnostics", "troubleshooting", "6003", "9109", "zone"],
+    "snippet": "6003 invalid API token (scope or rotation), 10000 authentication error, 9109/81057 unknown zone or record, 7003 routing/unknown path, 429 rate limited. Check /user/tokens/verify first and CLOUDFLARE_ZONE_MAP for zone ids.",
+    "summary": "Map Cloudflare error codes to the correct fix.",
+    "code": "curl -H \"Authorization: Bearer $TOKEN\" https://api.cloudflare.com/client/v4/user/tokens/verify\n# {\"success\":false,\"errors\":[{\"code\":6003,\"message\":\"Invalid access token\"}]}\n# {\"success\":false,\"errors\":[{\"code\":9109,\"message\":\"Zone not found\"}]} -> fix zone id mapping",
+    "url": "https://developers.cloudflare.com/support/troubleshooting/general-troubleshooting/"
+  },
+  {
+    "id": "streams-queues",
+    "title": "Queues and Streams for async work",
+    "product": "queues",
+    "tags": ["queues", "consumer", "batch", "stream", "hls", "async"],
+    "snippet": "Queues decouple Workers with producers and consumers (batch size/max timeouts), Hibernatable WebSockets and DLQs. R2-backed video uses Cloudflare Stream with direct upload + play codes.",
+    "summary": "Choose Queues for at-least-once async processing, Stream for video.",
+    "code": "wrangler queues create jobs --delay seconds\n\nexport default {\n  async fetch(req: Request): Promise<Response> { return new Response('ok'); },\n  async queue(batch: MessageBatch<Env>, env: Env): Promise<void> {\n    for (const msg of batch.messages) await handle(msg.body);\n    batch.ackAll();\n  },\n};",
+    "url": "https://developers.cloudflare.com/queues/"
+  },
+  {
+    "id": "security-waf",
+    "title": "WAF, rate limiting and Access policies",
+    "product": "security",
+    "tags": ["waf", "rate-limit", "access", "zero-trust", "firewall", "bot"],
+    "snippet": "Zone level WAF custom rules, rate limiting rules and Bot Fight Mode protect origins behind proxied DNS. Cloudflare Access adds identity-aware zero-trust access in front of applications.",
+    "summary": "Layer edge security after DNS records are proxied.",
+    "code": "PUT /zones/{zone_id}/rulesets  (http_request_firewall_custom)\n{\"action\":\"block\",\"expression\":\"(http.request.uri.path contains \\\"/admin\\\")\"}\n\n# rate limiting\n{\"action\":\"block\",\"expression\":\"true\",\"action_parameters\":{\"count\":100,\"period\":60}}",
+    "url": "https://developers.cloudflare.com/waf/"
+  },
+  {
+    "id": "cache-api",
+    "title": "Caching: Cache API, cache rules and purge",
+    "product": "caching",
+    "tags": ["cache", "cache-api", "purge", "ttl", "fetch", "edge"],
+    "snippet": "caches.default in a Worker caches at the edge by URL; Cache Rules shape CDN cache behaviour; purge via POST /zones/{zone_id}/purge_cache with purge_everything or tags/hosts/url lists.",
+    "summary": "Control edge caching from Worker code or zone configuration.",
+    "code": "const cache = caches.default;\nlet res = await cache.match(req) ?? await fetch(req);\nconst out = new Response(res.body, res);\nout.headers.set('Cache-Control', 'public, max-age=60');\nawait cache.put(req, out.clone());\n\n# POST /zones/{zone_id}/purge_cache {\"purge_everything\":true}",
+    "url": "https://developers.cloudflare.com/cache/"
+  },
+  {
+    "id": "migrations",
+    "title": "Configuration migration gut-check",
+    "product": "architecture",
+    "tags": ["migration", "rollback", "safe", "compatibility", "schema"],
+    "snippet": "When changing Cloudflare configuration through an MCP tool: capture the previous record/resource state first, prefer idempotent upserts, keep DNS TTLs low during cutovers, and verify with a read tool before declaring done.",
+    "summary": "Operational checklist before mutating production resources.",
+    "code": "cf_dns_list zone=example.com name=app.example.com type=A   # before\n# change (ttl=1, proxied=false during cutover)\ncf_dns_upsert zone=example.com name=app.example.com type=A ...  # apply\n# verify\n# re-read: expect action=updated and previous content captured for rollback",
+    "url": "https://developers.cloudflare.com/"
+  },
+  {
+    "id": "do-config",
+    "title": "Session and connection limits at the edge",
+    "product": "architecture",
+    "tags": ["limits", "sessions", "concurrency", "keepalive", "pool"],
+    "snippet": "Cloudflare terminates TLS and reuse happens per PoP: clients should use connection pooling (http keep-alive) rather than one-shot requests. Node httpx pools per unique origin by default.",
+    "summary": "Client-side performance guidance for API-heavy tooling.",
+    "code": "import httpx\nclient = httpx.Client(base_url=API, headers={'Authorization': f'Bearer {token}'})  # keep-alive",
+    "url": "https://developers.cloudflare.com/network/"
+  }
+]

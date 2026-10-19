@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cloudflare-mcp"
+version = "0.1.0"
+description = "Unified Model Context Protocol server for Cloudflare infrastructure: D1 SQL, Workers, KV/R2 storage, DNS records and on-demand documentation search."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "OrquestraAI" }]
+keywords = ["mcp", "cloudflare", "d1", "workers", "kv", "r2", "dns"]
+dependencies = [
+  "mcp>=2.0",
+  "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "build>=1.2",
+]
+
+[project.scripts]
+cloudflare-mcp = "cloudflare_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["cloudflare_mcp"]
+
+# The bundled documentation corpus is data, not Python, so hatchling's default
+# file selection drops it. Without this the installed server cannot answer
+# cf_search_docs at all.
+[tool.hatch.build.targets.wheel.force-include]
+"cloudflare_mcp/data/docs_index.json" = "cloudflare_mcp/data/docs_index.json"
+
+[tool.hatch.build.targets.sdist]
+include = ["cloudflare_mcp", "tests", "README.md", "pyproject.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --basetemp=/var/tmp/testing/cfmcp-pytest"
+filterwarnings = [
+  "error::DeprecationWarning:cloudflare_mcp.*",
+]
