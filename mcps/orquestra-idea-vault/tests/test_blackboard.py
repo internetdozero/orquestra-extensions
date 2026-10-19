@@ -12,9 +12,12 @@ from idea_vault.store import ENV_DB_PATH, configure, get_database, reset_databas
 
 EXPECTED_TOOLS = [
     "record_idea",
+    "record_ideas_batch",
     "list_ideas",
     "search_ideas",
+    "update_idea",
     "update_idea_status",
+    "delete_idea",
     "export_ideas_markdown",
     "post_board_note",
     "read_board_notes",
@@ -79,17 +82,30 @@ def test_server_registers_every_tool_and_uses_configured_database(db_path):
         result = await server.call_tool(
             "record_idea", {"project": "MCP", "title": "via tool", "tags": ["x"]}
         )
+        batch = await server.call_tool(
+            "record_ideas_batch",
+            {"project": "MCP", "items": [{"title": "batch 1"}, {"title": "batch 2"}]},
+        )
+        updated = await server.call_tool(
+            "update_idea", {"idea_id": 1, "title": "via tool updated"}
+        )
+        compact = await server.call_tool("list_ideas", {"project": "MCP", "compact": True})
+        deleted = await server.call_tool("delete_idea", {"idea_id": 1})
         listed = await server.call_tool("list_ideas", {"project": "MCP"})
-        return tools, result, listed
+        return tools, result, batch, updated, compact, deleted, listed
 
-    tools, result, listed = asyncio.run(exercise())
+    tools, result, batch, updated, compact, deleted, listed = asyncio.run(exercise())
     assert [tool.name for tool in tools] == EXPECTED_TOOLS
     assert result.structured_content["id"] == 1
-    assert listed.structured_content["count"] == 1
+    assert batch.structured_content["count"] == 2
+    assert updated.structured_content["title"] == "via tool updated"
+    assert compact.structured_content["compact"] is True
+    assert deleted.structured_content["deleted"] is True
+    assert listed.structured_content["count"] == 2
     assert db_path.exists()
 
     with sqlite3.connect(db_path) as check:
-        assert check.execute("SELECT COUNT(*) FROM ideas").fetchone()[0] == 1
+        assert check.execute("SELECT COUNT(*) FROM ideas").fetchone()[0] == 2
 
 
 def test_configure_pins_path_for_tools_without_env(tmp_path, monkeypatch):

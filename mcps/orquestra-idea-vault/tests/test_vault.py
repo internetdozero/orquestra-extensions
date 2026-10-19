@@ -174,3 +174,119 @@ def test_tag_helpers_tolerate_legacy_and_iterables():
     assert load_tags("legacy,comma") == ["legacy", "comma"]
     assert load_tags('["json", "array"]') == ["json", "array"]
     assert load_tags(None) == []
+
+
+def test_update_idea_fields(conn):
+    created = _record(
+        conn,
+        title="Initial title",
+        description="Initial desc",
+        category="feature",
+        priority="low",
+        tags=["old"],
+    )
+    updated = ideas.update_idea(
+        conn,
+        created["id"],
+        title="Updated title",
+        description="Updated desc",
+        category="architecture",
+        priority="critical",
+        tags=["new", "tags"],
+    )
+    assert updated["id"] == created["id"]
+    assert updated["title"] == "Updated title"
+    assert updated["description"] == "Updated desc"
+    assert updated["category"] == "architecture"
+    assert updated["priority"] == "critical"
+    assert updated["tags"] == ["new", "tags"]
+    assert updated["message"] == f"Idea #{created['id']} updated successfully."
+    assert updated["updated_at"] >= created["updated_at"]
+
+    # Partial update: title and category remain untouched
+    partial = ideas.update_idea(conn, created["id"], priority="high")
+    assert partial["priority"] == "high"
+    assert partial["title"] == "Updated title"
+
+    # Input validation
+    with pytest.raises(ValueError):
+        ideas.update_idea(conn, created["id"], title="   ")
+    with pytest.raises(ValueError):
+        ideas.update_idea(conn, created["id"], category="invalid")
+    with pytest.raises(ValueError):
+        ideas.update_idea(conn, created["id"], priority="urgent")
+
+
+def test_update_idea_not_found(conn):
+    with pytest.raises(LookupError, match="idea #999 not found"):
+        ideas.update_idea(conn, 999, title="Does not exist")
+
+
+def test_delete_idea(conn):
+    created = _record(conn, title="Temporary idea")
+    result = ideas.delete_idea(conn, created["id"])
+    assert result == {
+        "id": created["id"],
+        "deleted": True,
+        "message": f"Idea #{created['id']} deleted.",
+    }
+    assert (
+        conn.execute("SELECT * FROM ideas WHERE id = ?", (created["id"],)).fetchone()
+        is None
+    )
+
+
+def test_delete_idea_not_found(conn):
+    with pytest.raises(LookupError, match="idea #999 not found"):
+        ideas.delete_idea(conn, 999)
+
+
+def test_list_ideas_compact_mode(conn):
+    _record(conn, title="Idea 1", description="Detailed description 1", tags=["t1", "t2"], priority="high")
+    _record(conn, title="Idea 2", description="Detailed description 2", tags=["t3"], priority="low")
+
+    normal = ideas.list_ideas(conn, project="OrquestraAI", compact=False)
+    assert "compact" not in normal
+    assert "description" in normal["ideas"][0]
+    assert "tags" in normal["ideas"][0]
+
+    compact = ideas.list_ideas(conn, project="OrquestraAI", compact=True)
+    assert compact["compact"] is True
+    assert compact["count"] == 2
+    for item in compact["ideas"]:
+        assert set(item.keys()) == {
+            "id", "project", "title", "priority", "category", "status", "updated_at"
+        }
+        assert "description" not in item
+        assert "tags" not in item
+
+
+def test_record_ideas_batch(conn):
+    items = [
+        {"title": "Idea A", "description": "Desc A", "category": "feature", "priority": "high", "tags": ["a"]},
+        {"title": "Idea B", "category": "bug", "priority": "critical"},
+        {"title": "Idea C"},
+    ]
+    result = ideas.record_ideas_batch(conn, "BatchProject", items)
+    assert result["count"] == 3
+    assert result["project"] == "BatchProject"
+    assert len(result["ideas"]) == 3
+    assert result["message"] == "Recorded 3 ideas in BatchProject."
+    assert result["ideas"][0]["title"] == "Idea A"
+    assert result["ideas"][0]["priority"] == "high"
+    assert result["ideas"][1]["title"] == "Idea B"
+    assert result["ideas"][1]["category"] == "bug"
+    assert result["ideas"][2]["title"] == "Idea C"
+    assert result["ideas"][2]["category"] == "feature"
+    assert result["ideas"][2]["priority"] == "medium"
+
+    # Atomic rollback on invalid item
+    count_before = conn.execute("SELECT COUNT(*) FROM ideas").fetchone()[0]
+    bad_items = [
+        {"title": "Good idea"},
+        {"title": "Bad category", "category": "unsupported"},
+    ]
+    with pytest.raises(ValueError):
+        ideas.record_ideas_batch(conn, "BatchProject", bad_items)
+    count_after = conn.execute("SELECT COUNT(*) FROM ideas").fetchone()[0]
+    assert count_after == count_before

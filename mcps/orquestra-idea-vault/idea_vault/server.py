@@ -46,6 +46,18 @@ def record_idea(
 
 
 @server.tool(
+    description="Bulk insert multiple ideas for a project in a single transaction."
+)
+def record_ideas_batch(
+    project: str,
+    items: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Record multiple ideas atomically. Each item can include title, description, category, priority, and tags."""
+    with get_database() as conn:
+        return ideas.record_ideas_batch(conn, project, items)
+
+
+@server.tool(
     description="List ideas filtered by project, status (default open), category and priority."
 )
 def list_ideas(
@@ -53,10 +65,13 @@ def list_ideas(
     status: str = "open",
     category: str | None = None,
     priority: str | None = None,
+    compact: bool = False,
 ) -> dict[str, Any]:
     """List ideas. status: open|in_progress|completed|archived|all."""
     with get_database() as conn:
-        return ideas.list_ideas(conn, project, status, category, priority)
+        return ideas.list_ideas(
+            conn, project, status, category, priority, compact=compact
+        )
 
 
 @server.tool(
@@ -69,12 +84,37 @@ def search_ideas(query: str, project: str | None = None) -> dict[str, Any]:
 
 
 @server.tool(
+    description="Update an existing idea's title, description, category, priority, or tags."
+)
+def update_idea(
+    idea_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    category: str | None = None,
+    priority: str | None = None,
+    tags: list[str] | None = None,
+) -> dict[str, Any]:
+    """Update an existing idea's fields by id."""
+    with get_database() as conn:
+        return ideas.update_idea(
+            conn, idea_id, title, description, category, priority, tags
+        )
+
+
+@server.tool(
     description="Transition an idea to open, in_progress, completed or archived."
 )
 def update_idea_status(idea_id: int, status: str) -> dict[str, Any]:
     """Update an idea's status by id."""
     with get_database() as conn:
         return ideas.update_idea_status(conn, idea_id, status)
+
+
+@server.tool(description="Permanently delete an idea from the vault by its ID.")
+def delete_idea(idea_id: int) -> dict[str, Any]:
+    """Permanently delete an idea from the vault by its ID."""
+    with get_database() as conn:
+        return ideas.delete_idea(conn, idea_id)
 
 
 @server.tool(

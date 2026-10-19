@@ -22,12 +22,12 @@ PRIORITY_RANK = (
     "WHEN 'medium' THEN 2 ELSE 3 END"
 )
 CATEGORY_TITLES = {
-    "feature": "Features",
-    "architecture": "Architecture",
-    "bug": "Bugs",
-    "ux": "UX",
-    "idea": "Ideas",
+    "feature": "Features", "architecture": "Architecture",
+    "bug": "Bugs", "ux": "UX", "idea": "Ideas",
 }
+COMPACT_FIELDS = (
+    "id", "project", "title", "priority", "category", "status", "updated_at"
+)
 
 
 def record_idea(
@@ -55,6 +55,50 @@ def record_idea(
     return data
 
 
+def record_ideas_batch(
+    conn: sqlite3.Connection,
+    project: str,
+    items: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Bulk insert multiple ideas for a project in an atomic transaction."""
+    project = require_text(project, "project")
+    if not isinstance(items, (list, tuple)):
+        raise ValueError("items must be a list of dictionaries")
+    savepoint_name = "sp_record_ideas_batch"
+    conn.execute(f"SAVEPOINT {savepoint_name}")
+    recorded: list[dict[str, Any]] = []
+    try:
+        for item in items:
+            if not isinstance(item, dict):
+                raise ValueError("Each item in items must be a dictionary")
+            title = item.get("title")
+            description = item.get("description", "")
+            category = item.get("category") or "feature"
+            priority = item.get("priority") or "medium"
+            tags = item.get("tags")
+            data = record_idea(
+                conn,
+                project=project,
+                title=title,
+                description=description,
+                category=category,
+                priority=priority,
+                tags=tags,
+            )
+            recorded.append(data)
+        conn.execute(f"RELEASE SAVEPOINT {savepoint_name}")
+    except Exception:
+        conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
+        raise
+
+    return {
+        "count": len(recorded),
+        "project": project,
+        "ideas": recorded,
+        "message": f"Recorded {len(recorded)} ideas in {project}.",
+    }
+
+
 def list_ideas(
     conn: sqlite3.Connection,
     project: str | None = None,
@@ -62,6 +106,7 @@ def list_ideas(
     category: str | None = None,
     priority: str | None = None,
     limit: int = 200,
+    compact: bool = False,
 ) -> dict[str, Any]:
     """List ideas by project, status, category and priority, highest priority first."""
     clauses: list[str] = []
@@ -88,6 +133,14 @@ def list_ideas(
         "LIMIT ?",
         (*params, max(1, int(limit))),
     ).fetchall()
+    if compact:
+        compact_ideas = [{f: row[f] for f in COMPACT_FIELDS} for row in rows]
+        return {
+            "count": len(compact_ideas),
+            "status": status_filter or "all",
+            "ideas": compact_ideas,
+            "compact": True,
+        }
     ideas = [idea_dict(row) for row in rows]
     return {"count": len(ideas), "status": status_filter or "all", "ideas": ideas}
 
@@ -134,6 +187,57 @@ def update_idea_status(
     return data
 
 
+def update_idea(
+    conn: sqlite3.Connection,
+    idea_id: int,
+    title: str | None = None,
+    description: str | None = None,
+    category: str | None = None,
+    priority: str | None = None,
+    tags: Iterable[str] | str | None = None,
+) -> dict[str, Any]:
+    """Update an idea's fields and return the updated row."""
+    clauses: list[str] = ["updated_at = CURRENT_TIMESTAMP"]
+    params: list[Any] = []
+    if title is not None:
+        clauses.append("title = ?")
+        params.append(require_text(title, "title"))
+    if description is not None:
+        clauses.append("description = ?")
+        params.append(str(description).strip())
+    if category is not None:
+        clauses.append("category = ?")
+        params.append(require_choice(category, CATEGORIES, "category"))
+    if priority is not None:
+        clauses.append("priority = ?")
+        params.append(require_choice(priority, PRIORITIES, "priority"))
+    if tags is not None:
+        clauses.append("tags = ?")
+        params.append(dump_tags(tags))
+
+    params.append(int(idea_id))
+    cursor = conn.execute(
+        f"UPDATE ideas SET {', '.join(clauses)} WHERE id = ?",
+        params,
+    )
+    if cursor.rowcount == 0:
+        raise LookupError(f"idea #{idea_id} not found")
+    row = conn.execute("SELECT * FROM ideas WHERE id = ?", (int(idea_id),)).fetchone()
+    data = idea_dict(row)
+    data["message"] = f"Idea #{data['id']} updated successfully."
+    return data
+
+
+def delete_idea(conn: sqlite3.Connection, idea_id: int) -> dict[str, Any]:
+    """Permanently delete an idea from the vault by its ID."""
+    idea_id = int(idea_id)
+    row = conn.execute("SELECT * FROM ideas WHERE id = ?", (idea_id,)).fetchone()
+    if row is None:
+        raise LookupError(f"idea #{idea_id} not found")
+    conn.execute("DELETE FROM ideas WHERE id = ?", (idea_id,))
+    return {"id": idea_id, "deleted": True, "message": f"Idea #{idea_id} deleted."}
+
+
 def _bullet(idea: dict[str, Any]) -> str:
     parts = [f"- [ ] **{idea['title']}**"]
     if idea["description"]:
@@ -178,9 +282,12 @@ def export_ideas_markdown(conn: sqlite3.Connection, project: str) -> dict[str, A
 
 __all__ = [
     "record_idea",
+    "record_ideas_batch",
     "list_ideas",
     "search_ideas",
+    "update_idea",
     "update_idea_status",
+    "delete_idea",
     "export_ideas_markdown",
     "parse_tags",
     "load_tags",

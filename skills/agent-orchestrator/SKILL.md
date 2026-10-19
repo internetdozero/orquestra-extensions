@@ -44,6 +44,10 @@ Output a self-contained prompt for the Builder AI containing:
 - **Mission & Context:** Exact goal, active repository path, and relevant background.
 - **Files & Symbols:** Absolute or relative paths to files to create or modify, highlighting interfaces to preserve.
 - **Behavioral Specs:** Step-by-step functionality, edge cases, error handling.
+- **Idea Vault Task Lifecycle (Mandatory when MCP is active):**
+  If the `idea-vault` MCP is available or a task/idea ID is assigned:
+  1. *On Kickoff:* Instruct the Builder to immediately transition the idea to `in_progress` via `update_idea_status(idea_id=<ID>, status="in_progress")`.
+  2. *On Completion:* Instruct the Builder to transition the idea to `completed` via `update_idea_status(idea_id=<ID>, status="completed")` as soon as all tests and builds pass.
 - **Engineering Guardrails (Mandatory):**
   - *Anti-Monolith:* Keep files strictly under 300–400 lines; decompose into submodules if growing.
   - *Surgical Patching:* Restrict changes strictly to requested scope; zero breaking changes to existing contracts.

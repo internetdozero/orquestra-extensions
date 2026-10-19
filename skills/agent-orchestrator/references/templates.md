@@ -21,7 +21,12 @@ Copy-pasteable Markdown block to dispatch to the Builder AI:
 - <Bullet point 2: edge case or specific handling required>
 - <Bullet point 3: data flow or state mutation expectations>
 
-#### 3. Engineering Guardrails (Strict)
+#### 3. Idea Vault Task Lifecycle (Mandatory when idea-vault MCP is present)
+- **Idea ID:** `<ID>` (e.g., `#245`)
+- **On Start:** Transition status to in-progress: `update_idea_status(idea_id=<ID>, status="in_progress")`.
+- **On Completion:** Transition status to completed: `update_idea_status(idea_id=<ID>, status="completed")` after all verification checks pass.
+
+#### 4. Engineering Guardrails (Strict)
 - **Anti-Monolith Rule:** Keep all modified or newly created files strictly under 300–400 lines. Decompose into submodules/components if growing beyond this limit.
 - **Surgical Patch:** Do not refactor unrelated modules, change public API signatures, or modify unrequested configuration keys.
 - **Token Efficiency:** Prefix CLI commands with `rtk` (e.g., `rtk npm test`, `rtk cargo check`, `rtk git status`) to minimize context bloat.
