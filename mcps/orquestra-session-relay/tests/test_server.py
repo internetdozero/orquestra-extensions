@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from builders import make_codex
+from builders import make_codex, make_freebuff_desktop
 from session_relay.server import server
 
 TOOLS = [
@@ -88,6 +88,46 @@ def test_list_inspect_search_and_handoff(relay_home):
     found = _call("search_sessions_history", {"query": "deploy"})
     assert found.structured_content["count"] >= 1
     assert found.structured_content["hits"][0]["harness"] == "codex"
+
+
+def test_inspect_desktop_without_harness(relay_home):
+    thread = "d89c29ca-be1c-4fe8-be92-f4de238d0286"
+    make_freebuff_desktop(
+        relay_home,
+        "OrquestraAI-708e6d53",
+        [
+            {
+                "id": thread,
+                "title": "Community Skills Hub",
+                "project_path": "/work/OrquestraAI",
+                "created": 1_790_000_100_000,
+                "updated": 1_790_000_200_000,
+                "messages": [
+                    {
+                        "role": "user",
+                        "ts": 1_790_000_100_000,
+                        "parts": [{"kind": "text", "text": "Make the deploy faster"}],
+                    },
+                ],
+            }
+        ],
+    )
+    session_id = f"desktop:OrquestraAI-708e6d53:{thread}"
+
+    inspected = _call("inspect_session", {"session_id": session_id})
+    assert "error" not in inspected.structured_content
+    assert inspected.structured_content["harness"] == "freebuff"
+    assert inspected.structured_content["event_count"] == 1
+
+    tailed = _call("tail_agent_activity", {"session_id": session_id})
+    assert tailed.structured_content["harness"] == "freebuff"
+    assert tailed.structured_content["count"] == 1
+
+    unknown = _call("inspect_session", {"session_id": "desktop:nope:missing"})
+    assert "was not found for freebuff" in unknown.structured_content["error"]
+
+    missing = _call("inspect_session", {"session_id": "no-such-session"})
+    assert "not found across any harness" in missing.structured_content["error"]
 
 
 def test_empty_and_invalid_states_are_friendly(relay_home):

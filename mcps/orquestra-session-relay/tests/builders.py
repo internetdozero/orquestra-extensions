@@ -168,6 +168,55 @@ def make_freebuff(
     return path
 
 
+def make_freebuff_desktop(
+    home: Path, slug: str, threads: list[dict[str, Any]]
+) -> Path:
+    """Mimic a Freebuff Desktop v2 SQLite store for one project slug."""
+    db = home / ".config/freebuff-desktop/projects" / slug / "desktop-v2.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db)
+    conn.executescript(
+        """
+        CREATE TABLE threads (
+            id TEXT PRIMARY KEY, project_id TEXT NOT NULL,
+            project_path TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New thread',
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE messages (
+            seq INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL,
+            role TEXT NOT NULL, parts_json TEXT NOT NULL DEFAULT '[]',
+            ts INTEGER NOT NULL
+        );
+        """
+    )
+    for thread in threads:
+        conn.execute(
+            "INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                thread["id"],
+                "project-1",
+                thread.get("project_path", "/work/proj"),
+                thread.get("title", ""),
+                thread.get("created", 1_790_000_000_000),
+                thread.get("updated", 1_790_000_000_000),
+            ),
+        )
+        for message in thread.get("messages", []):
+            conn.execute(
+                "INSERT INTO messages (thread_id, role, parts_json, ts)"
+                " VALUES (?, ?, ?, ?)",
+                (
+                    thread["id"],
+                    message["role"],
+                    json.dumps(message["parts"]),
+                    message.get("ts", 1_790_000_000_000),
+                ),
+            )
+    conn.commit()
+    conn.close()
+    return db
+
+
 def make_freebuff_history(home: Path, prompts: list[str]) -> Path:
     path = home / ".config/manicode/message-history.json"
     path.parent.mkdir(parents=True, exist_ok=True)

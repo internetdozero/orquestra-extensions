@@ -8,6 +8,16 @@ from typing import Any
 from ..models import Event, SearchHit, SessionDetail, SessionSummary
 from ..paths import clip, read_json, snippet
 from .base import SessionAdapter, limit_turns
+from .freebuff_desktop import (
+    desktop_databases,
+    desktop_events,
+    find_desktop_thread,
+    list_desktop_threads,
+    load_desktop_messages,
+    search_desktop_threads,
+    split_desktop_id,
+    summarize_desktop_thread,
+)
 from .freebuff_store import (
     events_from_messages,
     history_summary,
@@ -30,6 +40,9 @@ class FreebuffAdapter(SessionAdapter):
     def history_path(self) -> Path:
         return self.home / ".config" / "manicode" / "message-history.json"
 
+    def _has_desktop(self) -> bool:
+        return bool(desktop_databases(self.home))
+
     def _chat_files(self) -> list[Path]:
         if not self.projects.is_dir():
             return []
@@ -49,13 +62,18 @@ class FreebuffAdapter(SessionAdapter):
         return []
 
     def available(self) -> bool:
-        return bool(self._chat_files()) or bool(self._history())
+        return (
+            bool(self._chat_files())
+            or bool(self._history())
+            or self._has_desktop()
+        )
 
     def list_sessions(self, limit: int = 5) -> list[SessionSummary]:
-        sessions = [
-            summarize_chat(path, self.id)
-            for path in self._chat_files()[: max(1, int(limit))]
-        ]
+        bound = max(1, int(limit))
+        sessions = [summarize_chat(path, self.id) for path in self._chat_files()]
+        sessions.extend(list_desktop_threads(self.home, self.id, limit=bound))
+        sessions.sort(key=lambda item: item.updated_at or "", reverse=True)
+        sessions = sessions[:bound]
         if sessions:
             return sessions
         history = self._history()
@@ -69,9 +87,61 @@ class FreebuffAdapter(SessionAdapter):
             return files[0] if files else None
         return next((path for path in files if path.parent.name == session_id), None)
 
+    def _load_desktop(
+        self, session_id: str, max_turns: int
+    ) -> SessionDetail | None:
+        """Load a desktop thread by full id, raw UUID, or newest-first."""
+        if session_id == "latest":
+            newest = list_desktop_threads(self.home, self.id, limit=1)
+            if not newest:
+                return None
+            session_id = newest[0].session_id
+        parsed = split_desktop_id(session_id)
+        if parsed is None:
+            return None
+        slug, thread_id = parsed
+        if not thread_id:
+            return None
+        found = find_desktop_thread(self.home, slug, thread_id)
+        if found is None:
+            return None
+        slug, db, row = found
+        with_desktop_counts = summarize_desktop_thread(slug, db, row, self.id)
+        rows = load_desktop_messages(db, thread_id)
+        if not rows and not str(row.get("title") or ""):
+            return None
+        users = sum(1 for item in rows if item.get("role") == "user")
+        summary = SessionSummary(
+            harness=self.id,
+            session_id=with_desktop_counts.session_id,
+            title=with_desktop_counts.title,
+            updated_at=with_desktop_counts.updated_at,
+            turns_count=users,
+            project=with_desktop_counts.project,
+            source=with_desktop_counts.source,
+        )
+        return SessionDetail(
+            summary=summary,
+            events=limit_turns(desktop_events(rows), max_turns),
+        )
+
     def load_session(
         self, session_id: str = "latest", max_turns: int = 10
     ) -> SessionDetail | None:
+        if split_desktop_id(session_id) is not None or (
+            session_id == "latest"
+            and not self._chat_files()
+            and self._has_desktop()
+        ):
+            detail = self._load_desktop(session_id, max_turns)
+            # An explicit desktop id that misses is final; a corrupt store
+            # under "latest" falls through to legacy chats and history.
+            if detail is not None or split_desktop_id(session_id) is not None:
+                return detail
+        if session_id == "latest" and self._has_desktop():
+            newest = self.list_sessions(limit=1)
+            if newest:
+                return self.load_session(newest[0].session_id, max_turns)
         if session_id == "prompt-history" or (
             session_id == "latest" and not self._chat_files() and self._history()
         ):
@@ -128,6 +198,10 @@ class FreebuffAdapter(SessionAdapter):
             )
             if len(hits) >= max(1, int(limit)):
                 break
+        hits.extend(
+            search_desktop_threads(self.home, self.id, needle, limit)[: max(1, int(limit))]
+        )
+        hits.sort(key=lambda hit: hit.updated_at or "", reverse=True)
         if hits:
-            return hits
+            return hits[: max(1, int(limit))]
         return search_prompts(self.history_path, self._history(), needle, limit)

@@ -56,15 +56,59 @@ def list_recent_sessions(
     }
 
 
+PREFIX_HARNESS = {
+    "desktop:": "freebuff",
+    "claude:": "claude",
+    "codex:": "codex",
+}
+
+
+def _infer_harness(session_id: str) -> str | None:
+    """Guess the harness from a session-id prefix, if it carries one."""
+    text = (session_id or "").strip()
+    for prefix, harness in PREFIX_HARNESS.items():
+        if text.startswith(prefix):
+            return harness
+    return None
+
+
+def _find_harness_for(session_id: str, skip: str | None = None) -> str | None:
+    """Return the first harness whose store can load the session id."""
+    for adapter in discovery.adapters_for():
+        if skip is not None and adapter.id == skip:
+            continue
+        try:
+            if adapter.available() and adapter.load_session(session_id, 1):
+                return adapter.id
+        except Exception:
+            continue
+    return None
+
+
 @server.tool(
-    description="Read a session's ordered conversation and tool events. session_id defaults to the newest one."
+    description="Read a session's ordered conversation and tool events. session_id defaults to the newest one; harness is inferred from desktop:/claude:/codex: prefixes or searched across harnesses when omitted."
 )
 def inspect_session(
-    harness: str, session_id: str = "latest", max_turns: int = 10
+    harness: str | None = None, session_id: str = "latest", max_turns: int = 10
 ) -> dict[str, Any]:
     """Inspect one session; max_turns keeps only the most recent user turns."""
+    resolved = (harness or "").strip() or None
+    if resolved is None:
+        resolved = _infer_harness(session_id)
+    if resolved is None and session_id != "latest":
+        resolved = _find_harness_for(session_id)
+    if resolved is None and session_id == "latest":
+        newest, _ = discovery.recent_sessions(limit=1)
+        if newest:
+            resolved = newest[0].harness
+            session_id = newest[0].session_id
+    if resolved is None:
+        return {
+            "error": f"session '{session_id}' was not found across any harness",
+            "events": [],
+        }
     try:
-        adapter = discovery.get_adapter(harness)
+        adapter = discovery.get_adapter(resolved)
     except ValueError as error:
         return {"error": str(error)}
     if not adapter.available():
@@ -74,6 +118,15 @@ def inspect_session(
             "events": [],
         }
     detail = adapter.load_session(session_id, _bounds(max_turns, 10, 50))
+    if detail is None and not harness:
+        # A wrong prefix guess must not hide a session living elsewhere.
+        fallback = _find_harness_for(session_id, skip=adapter.id)
+        if fallback is not None:
+            try:
+                adapter = discovery.get_adapter(fallback)
+                detail = adapter.load_session(session_id, _bounds(max_turns, 10, 50))
+            except ValueError:
+                detail = None
     if detail is None:
         return {
             "error": f"session '{session_id}' was not found for {adapter.id}",

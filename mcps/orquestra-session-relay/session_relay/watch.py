@@ -176,6 +176,23 @@ def _resolve_target(
             return None, None, "no sessions found across any harness"
         return sessions[0].harness, sessions[0].session_id, None
 
+    # Prefixed ids (desktop:/claude:/codex:) resolve straight to their
+    # harness when that store can load them, without depending on the
+    # recency window below.
+    for prefix, hinted in (
+        ("desktop:", "freebuff"),
+        ("claude:", "claude"),
+        ("codex:", "codex"),
+    ):
+        if session_id.startswith(prefix):
+            try:
+                adapter = discovery.get_adapter(hinted)
+                if adapter.available() and adapter.load_session(session_id, max_turns=1):
+                    return hinted, session_id, None
+            except Exception:
+                pass
+            break
+
     # Search for session_id across recent sessions or adapters
     sessions, _ = discovery.recent_sessions(limit=50)
     matches = [s for s in sessions if s.session_id == session_id]
