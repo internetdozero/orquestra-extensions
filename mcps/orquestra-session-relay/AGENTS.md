@@ -23,6 +23,7 @@ Group by capability. The entry point only wires modules. A shared module exists 
 - `session_relay/adapters/codex_items.py` — Codex thread-item to event mapping.
 - `session_relay/adapters/opencode_parts.py` — OpenCode message/part to event mapping.
 - `session_relay/adapters/freebuff_store.py` — bounded readers for very large Freebuff chat JSON.
+- `session_relay/adapters/freebuff_desktop.py` — read-only Freebuff Desktop v2 SQLite (`desktop:<slug>:<thread-id>` ids, `parts_json` mapping).
 - `tests/` — per-adapter fixtures, handoff and MCP wiring tests.
 
 ## Commands
@@ -34,7 +35,7 @@ Group by capability. The entry point only wires modules. A shared module exists 
 
 ## Safety
 
-Foreign harness session databases and files are opened read-only (`mode=ro`, `query_only`, plain reads). Never write into `~/.codex`, `~/.claude`, `~/.gemini`, `~/.local/share/opencode` or `~/.config/manicode`.
+Foreign harness session databases and files are opened read-only (`mode=ro`, `query_only`, plain reads). Never write into `~/.codex`, `~/.claude`, `~/.gemini`, `~/.local/share/opencode`, `~/.config/manicode` or `~/.config/freebuff-desktop`.
 
 ## While editing
 

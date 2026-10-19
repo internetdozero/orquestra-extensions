@@ -1,0 +1,19 @@
+# Python build artifacts
+*.egg-info/
+__pycache__/
+.pytest_cache/
+dist/
+build/
+*.pyc
+*.pyo
+.venv/
+venv/
+# Rust / Tauri
+target/
+# Node
+node_modules/
+dist/
+# OS / editors
+.DS_Store
+*.swp
+*.swo
