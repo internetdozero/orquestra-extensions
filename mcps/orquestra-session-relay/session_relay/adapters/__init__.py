@@ -8,16 +8,22 @@ from .antigravity import AntigravityAdapter
 from .base import SessionAdapter
 from .claude import ClaudeAdapter
 from .codex import CodexAdapter
+from .copilot import CopilotAdapter
 from .freebuff import FreebuffAdapter
 from .grok import GrokAdapter
+from .hermes import HermesAdapter
+from .kilo import KiloAdapter
 from .opencode import OpenCodeAdapter
 
 ADAPTERS: tuple[type[SessionAdapter], ...] = (
     AntigravityAdapter,
     ClaudeAdapter,
     CodexAdapter,
+    CopilotAdapter,
     FreebuffAdapter,
     GrokAdapter,
+    HermesAdapter,
+    KiloAdapter,
     OpenCodeAdapter,
 )
 
@@ -46,8 +52,11 @@ __all__ = [
     "AntigravityAdapter",
     "ClaudeAdapter",
     "CodexAdapter",
+    "CopilotAdapter",
     "FreebuffAdapter",
     "GrokAdapter",
+    "HermesAdapter",
+    "KiloAdapter",
     "OpenCodeAdapter",
     "SessionAdapter",
     "build_adapters",

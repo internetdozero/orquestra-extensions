@@ -17,10 +17,26 @@ class SessionSummary:
     turns_count: int = 0
     project: str | None = None
     source: str | None = None
+    is_pinned: bool = False
+    pin_label: str | None = None
 
     @property
     def id(self) -> str:
         return self.session_id
+
+    def with_pin(self, label: str | None) -> SessionSummary:
+        """Copy decorated from the pins sidecar (never stored in a harness)."""
+        return SessionSummary(
+            harness=self.harness,
+            session_id=self.session_id,
+            title=self.title,
+            updated_at=self.updated_at,
+            turns_count=self.turns_count,
+            project=self.project,
+            source=self.source,
+            is_pinned=True,
+            pin_label=label,
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -31,6 +47,8 @@ class SessionSummary:
             "turns_count": self.turns_count,
             "project": self.project,
             "source": self.source,
+            "is_pinned": self.is_pinned,
+            "pin_label": self.pin_label,
         }
 
 

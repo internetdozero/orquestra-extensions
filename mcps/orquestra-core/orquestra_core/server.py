@@ -32,7 +32,9 @@ every installed harness into the fleet projection.
 
 Presets: orquestra_list_presets lists all built-in and custom mission presets;
 orquestra_apply_preset activates a named preset (stealth, rust-dev,
-web-fullstack, full-power) across all harnesses via the native binary.
+web-fullstack, full-power) across all harnesses via the native binary;
+orquestra_save_preset creates or updates a custom preset in presets.json and
+orquestra_delete_preset removes one (built-ins are protected).
 """
 
 server = MCPServer(
@@ -47,7 +49,7 @@ def _guarded(action: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -
     """Run a dict-returning action, turning known failures into readable errors."""
     try:
         return action(*args, **kwargs)
-    except (ValueError, RuntimeError) as error:
+    except (ValueError, LookupError, RuntimeError) as error:
         return {"error": str(error)}
 
 
@@ -132,6 +134,24 @@ def orquestra_list_presets() -> list[dict[str, Any]]:
 def orquestra_apply_preset(preset_id: str) -> dict[str, Any]:
     """Validates the id, then delegates to orquestra --preset <id> and returns a PresetReport."""
     return _guarded(presets.apply_preset, preset_id)
+
+
+@server.tool(description="Save a new custom mission preset with a selection of skills and MCP servers.")
+def orquestra_save_preset(
+    name: str,
+    description: str = "",
+    skills: list[str] | None = None,
+    mcps: list[str] | None = None,
+    icon: str = "custom",
+) -> dict[str, Any]:
+    """Creates or updates a custom preset in ~/.orquestra/presets.json."""
+    return _guarded(presets.save_preset, name, description, skills, mcps, icon)
+
+
+@server.tool(description="Delete a custom mission preset by its ID. Built-in presets cannot be deleted.")
+def orquestra_delete_preset(preset_id: str) -> dict[str, Any]:
+    """Removes a custom preset from ~/.orquestra/presets.json."""
+    return _guarded(presets.delete_preset, preset_id)
 
 
 @server.tool(

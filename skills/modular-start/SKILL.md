@@ -15,7 +15,7 @@ A direct instruction in the current conversation wins over this skill. Otherwise
 2. Run `git init` when `.git` is missing. Do not change global git config. If `user.name` or `user.email` is unset, set them on this repo only, from `gh api user` (`login`, and `{id}+{login}@users.noreply.github.com`). If that fails, stop and say the commit cannot be made. Do not invent an identity.
 3. Add a `.gitignore` before the first commit. Start from `assets/gitignore`. Extend it in the same commit that adds the tool files for this stack (dependencies, build output, secrets, local environments).
 4. Copy `assets/AGENTS.md` to the project root and fill the blanks. Copy `scripts/check-file-size.sh` to the project's `scripts/check-file-size.sh`. These are the first files you write. Do not raise `file_size_cap` or `file_size_soft` unless the user gives a number. Keep `AGENTS.md` under 100 lines. It is the contract every session loads: the two cap lines, the layout, the commands. A longer note goes in one `docs/` file linked from here.
-5. Add a README of at most 40 lines: what it is, how to run, how to test. Use "not yet" until a command exists, then replace it in the commit that adds the command. Mirror the real commands in `AGENTS.md`. The file-size check is `bash scripts/check-file-size.sh`.
+5. Add a README of at most 40 lines: what it is, how to run, how to test. Use "not yet" until a command exists, then replace it in the commit that adds the command. Mirror the real commands in `AGENTS.md`. The file-size check is `rtk bash scripts/check-file-size.sh`.
 6. Commit: `chore: start repo with module rules`.
 7. Only then add source.
 
@@ -44,7 +44,7 @@ Do not commit secrets, credentials, or generated binaries. Do not push, force-pu
 ## Check
 
 ```bash
-bash scripts/check-file-size.sh
+rtk bash scripts/check-file-size.sh
 ```
 
 Run the project's copy before saying the project is started and before saying a slice is done. The tree for that slice is committed. `file_size_cap` in the project's `AGENTS.md` is the number the checker enforces. Generated files, lockfiles, and vendored trees are outside the cap.

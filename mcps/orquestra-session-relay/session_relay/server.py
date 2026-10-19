@@ -8,16 +8,18 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from . import discovery, handoff, watch
+from . import discovery, handoff, policy, watch
 
 INSTRUCTIONS = """Read-only session relay for AI coding harnesses on this machine.
 
-Use list_recent_sessions to see what Codex, Claude Code, Antigravity, OpenCode
-and Freebuff were doing, inspect_session for the ordered conversation and tool
-events, search_sessions_history to find earlier work by keyword,
-handoff_context to produce a Goal / Files / State / Blocker / Next-steps brief,
-watch_active_agent to track live agent state and touched files in real time, and
-tail_agent_activity to tail concise summaries of the latest events.
+Use list_recent_sessions to see what Codex, Claude Code, Antigravity, OpenCode,
+Kilo, Copilot, Hermes and Freebuff were doing, inspect_session for the ordered
+conversation and tool events, search_sessions_history to find earlier work by
+keyword, handoff_context to produce a Goal / Files / State / Blocker /
+Next-steps brief, pin_session / unpin_session / list_pinned_sessions to protect
+sessions in ~/.orquestra/sessions_policy.json, watch_active_agent to track live
+agent state and touched files in real time, and tail_agent_activity to tail
+concise summaries of the latest events.
 
 Every store is opened read-only. Missing harnesses return friendly empty states.
 """
@@ -39,7 +41,7 @@ def _bounds(value: int, default: int, maximum: int) -> int:
 
 
 @server.tool(
-    description="List recent sessions across harnesses (codex, claude, antigravity, opencode, freebuff), newest first."
+    description="List recent sessions across all 9 harnesses (newest first); pinned sessions show is_pinned."
 )
 def list_recent_sessions(
     harness: str | None = None, limit: int = 5
@@ -49,11 +51,39 @@ def list_recent_sessions(
         sessions, warnings = discovery.recent_sessions(harness, _bounds(limit, 5, 50))
     except ValueError as error:
         return {"count": 0, "sessions": [], "warnings": [], "error": str(error)}
+    sessions = policy.decorate(sessions)
     return {
         "count": len(sessions),
         "sessions": [session.as_dict() for session in sessions],
         "warnings": warnings,
     }
+
+
+@server.tool(description="Pin a session so purges skip it (stored in ~/.orquestra).")
+def pin_session(
+    harness: str, session_id: str, label: str | None = None
+) -> dict[str, Any]:
+    """Protect one session; re-pinning only updates the label."""
+    try:
+        return policy.pin_session(harness, session_id, label)
+    except ValueError as error:
+        return {"pinned": False, "error": str(error)}
+
+
+@server.tool(description="Remove a session pin; missing pins report pinned False.")
+def unpin_session(harness: str, session_id: str) -> dict[str, Any]:
+    """Lift protection from one session."""
+    try:
+        return policy.unpin_session(harness, session_id)
+    except ValueError as error:
+        return {"pinned": False, "error": str(error)}
+
+
+@server.tool(description="List every pinned session from ~/.orquestra.")
+def list_pinned_sessions() -> dict[str, Any]:
+    """Return pins in file order with harness, sessionId and label."""
+    pins = policy.list_pins()
+    return {"count": len(pins), "pins": pins}
 
 
 PREFIX_HARNESS = {

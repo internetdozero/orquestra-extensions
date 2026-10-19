@@ -7,7 +7,10 @@ from typing import Any
 from .adapters import build_adapters, canonical_harness
 from .models import SessionSummary
 
-KNOWN = ("antigravity", "claude", "codex", "freebuff", "grok", "opencode")
+KNOWN = (
+    "antigravity", "claude", "codex", "copilot", "freebuff", "grok",
+    "hermes", "kilo", "opencode",
+)
 
 
 def adapters_for(harness: str | None = None):

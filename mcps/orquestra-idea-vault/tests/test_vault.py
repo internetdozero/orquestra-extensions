@@ -255,7 +255,8 @@ def test_list_ideas_compact_mode(conn):
     assert compact["count"] == 2
     for item in compact["ideas"]:
         assert set(item.keys()) == {
-            "id", "project", "title", "priority", "category", "status", "updated_at"
+            "id", "project", "title", "priority", "category", "status", "updated_at",
+            "completed_at",
         }
         assert "description" not in item
         assert "tags" not in item

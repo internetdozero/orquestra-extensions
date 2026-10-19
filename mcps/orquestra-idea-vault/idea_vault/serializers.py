@@ -18,6 +18,7 @@ IDEA_FIELDS = (
     "status",
     "created_at",
     "updated_at",
+    "completed_at",
 )
 
 
@@ -56,7 +57,9 @@ def load_tags(raw: str | None) -> list[str]:
 
 def idea_dict(row: Any) -> dict[str, Any]:
     """Map an ideas row to a plain dictionary with real tag lists."""
-    data = {field: row[field] for field in IDEA_FIELDS}
+    keys = set(row.keys()) if hasattr(row, "keys") else set()
+    data = {field: row[field] if field in keys else None for field in IDEA_FIELDS}
+    data["completed_at"] = row["completed_at"] if "completed_at" in keys else None
     data["description"] = data["description"] or ""
     data["tags"] = load_tags(row["tags"])
     return data

@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS ideas (
     tags        TEXT,
     status      TEXT NOT NULL DEFAULT 'open',
     created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at  TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS blackboard_notes (
@@ -57,6 +58,20 @@ def default_db_path() -> Path:
     return base / APP_DIR / DB_FILENAME
 
 
+def migrate_completed_at(conn: sqlite3.Connection) -> bool:
+    """Add ideas.completed_at and backfill legacy completions. Idempotent."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(ideas)").fetchall()}
+    if "completed_at" in columns:
+        return False
+    conn.execute("ALTER TABLE ideas ADD COLUMN completed_at TIMESTAMP")
+    conn.execute(
+        "UPDATE ideas SET completed_at = updated_at "
+        "WHERE status = 'completed' AND completed_at IS NULL"
+    )
+    conn.commit()
+    return True
+
+
 def connect(db_path: str | Path) -> sqlite3.Connection:
     """Open (creating directories and schema as needed) a connection to the vault."""
     path = Path(db_path).expanduser()
@@ -67,6 +82,7 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA busy_timeout=5000")
     conn.executescript(SCHEMA)
+    migrate_completed_at(conn)
     return conn
 
 

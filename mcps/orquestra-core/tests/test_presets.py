@@ -154,3 +154,117 @@ def test_deploy_bridge_returns_deployed_true(mock_home: Path) -> None:
     report = fleet.deploy_bridge()
     assert report["deployed"] is True
     assert "harnesses" in report
+
+
+# ---------------------------------------------------------------------------
+# save_preset — create
+# ---------------------------------------------------------------------------
+
+
+def test_save_preset_creates_entry(mock_home: Path) -> None:
+    saved = presets.save_preset(
+        "My Preset", "Operator custom", skills=["rtk"], mcps=["orquestra-core"]
+    )
+    assert saved["id"] == "my-preset"
+    assert saved["name"] == "My Preset"
+    assert saved["description"] == "Operator custom"
+    assert saved["skills"] == ["rtk"]
+    assert saved["mcps"] == ["orquestra-core"]
+    assert saved["icon"] == "custom"
+    assert saved["builtin"] is False
+    assert saved["harnessSkills"] == {} and saved["harnessMcps"] == {}
+
+    stored = json.loads(paths.presets_path().read_text(encoding="utf-8"))
+    assert [entry["id"] for entry in stored["custom"]] == ["my-preset"]
+
+    rows = presets.list_presets()
+    custom = next(r for r in rows if r["id"] == "my-preset")
+    assert custom["builtin"] is False
+
+
+def test_save_preset_captures_live_state_when_omitted(mock_home: Path) -> None:
+    from orquestra_core import skills as skills_mod
+
+    skills_mod.enable_skill("alpha", "global")
+    saved = presets.save_preset("Live Capture")
+    assert "alpha" in saved["skills"]
+    assert "alpha-mcp" in saved["mcps"]  # globally enabled fixture server
+
+
+def test_save_preset_updates_existing_entry(mock_home: Path) -> None:
+    presets.save_preset("My Preset", skills=["rtk"])
+    updated = presets.save_preset("My Preset", "New blurb", skills=["beta"])
+    assert updated["id"] == "my-preset"
+    assert updated["description"] == "New blurb"
+    rows = presets.list_presets()
+    assert len([r for r in rows if r["id"] == "my-preset"]) == 1
+
+
+def test_save_preset_rejects_builtin_collision(mock_home: Path) -> None:
+    with pytest.raises(ValueError, match="built-in"):
+        presets.save_preset("Stealth", skills=["rtk"])
+
+
+def test_save_preset_needs_a_name(mock_home: Path) -> None:
+    with pytest.raises(ValueError, match="needs a name"):
+        presets.save_preset("   ")
+
+
+# ---------------------------------------------------------------------------
+# delete_preset
+# ---------------------------------------------------------------------------
+
+
+def test_delete_preset_success(mock_home: Path) -> None:
+    presets.save_preset("My Preset", skills=["rtk"])
+    result = presets.delete_preset("my-preset")
+    assert result == {
+        "id": "my-preset",
+        "deleted": True,
+        "message": "Preset 'my-preset' deleted.",
+    }
+    assert "my-preset" not in [r["id"] for r in presets.list_presets()]
+
+
+def test_delete_preset_resets_active(mock_home: Path) -> None:
+    presets.save_preset("My Preset")
+    stored = json.loads(paths.presets_path().read_text(encoding="utf-8"))
+    stored["active"] = "my-preset"
+    paths.presets_path().write_text(json.dumps(stored), encoding="utf-8")
+    presets.delete_preset("my-preset")
+    rest = json.loads(paths.presets_path().read_text(encoding="utf-8"))
+    assert rest["active"] is None
+
+
+def test_delete_preset_rejects_builtin(mock_home: Path) -> None:
+    with pytest.raises(ValueError, match="Cannot delete built-in"):
+        presets.delete_preset("rust-dev")
+
+
+def test_delete_preset_not_found(mock_home: Path) -> None:
+    with pytest.raises(LookupError, match="not found"):
+        presets.delete_preset("ghost-preset")
+
+
+# ---------------------------------------------------------------------------
+# server tools
+# ---------------------------------------------------------------------------
+
+
+def test_save_delete_tools_roundtrip(mock_home: Path) -> None:
+    import asyncio
+
+    from orquestra_core.server import server
+
+    saved = asyncio.run(
+        server.call_tool("orquestra_save_preset", {"name": "Tool Preset"})
+    )
+    assert saved.structured_content["id"] == "tool-preset"
+    removed = asyncio.run(
+        server.call_tool("orquestra_delete_preset", {"preset_id": "tool-preset"})
+    )
+    assert removed.structured_content["deleted"] is True
+    builtin = asyncio.run(
+        server.call_tool("orquestra_delete_preset", {"preset_id": "stealth"})
+    )
+    assert "Cannot delete built-in" in builtin.structured_content["error"]

@@ -17,7 +17,7 @@ Group by capability. The entry point only wires modules. A shared module exists 
 
 ## Commands
 
-- Check file size: `bash scripts/check-file-size.sh`
+- Check file size: `rtk bash scripts/check-file-size.sh`
 - Run: not yet
 - Test: not yet
 

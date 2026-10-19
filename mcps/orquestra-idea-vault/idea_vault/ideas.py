@@ -26,7 +26,8 @@ CATEGORY_TITLES = {
     "bug": "Bugs", "ux": "UX", "idea": "Ideas",
 }
 COMPACT_FIELDS = (
-    "id", "project", "title", "priority", "category", "status", "updated_at"
+    "id", "project", "title", "priority", "category", "status", "updated_at",
+    "completed_at",
 )
 
 
@@ -38,16 +39,20 @@ def record_idea(
     category: str = "feature",
     priority: str = "medium",
     tags: Iterable[str] | str | None = None,
+    status: str = "open",
 ) -> dict[str, Any]:
     """Insert one idea and return the stored row with a confirmation message."""
     project = require_text(project, "project")
     title = require_text(title, "title")
     category = require_choice(category, CATEGORIES, "category")
     priority = require_choice(priority, PRIORITIES, "priority")
+    status = require_choice(status, STATUSES, "status")
+    completed_at = "CURRENT_TIMESTAMP" if status == "completed" else "NULL"
     cursor = conn.execute(
-        "INSERT INTO ideas (project, title, description, category, priority, tags) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (project, title, str(description or "").strip(), category, priority, dump_tags(tags)),
+        "INSERT INTO ideas (project, title, description, category, priority, tags, "
+        f"status, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, {completed_at})",
+        (project, title, str(description or "").strip(), category, priority, dump_tags(tags),
+         status),
     )
     row = conn.execute("SELECT * FROM ideas WHERE id = ?", (cursor.lastrowid,)).fetchone()
     data = idea_dict(row)
@@ -76,6 +81,7 @@ def record_ideas_batch(
             category = item.get("category") or "feature"
             priority = item.get("priority") or "medium"
             tags = item.get("tags")
+            status = item.get("status") or "open"
             data = record_idea(
                 conn,
                 project=project,
@@ -84,6 +90,7 @@ def record_ideas_batch(
                 category=category,
                 priority=priority,
                 tags=tags,
+                status=status,
             )
             recorded.append(data)
         conn.execute(f"RELEASE SAVEPOINT {savepoint_name}")
@@ -175,10 +182,24 @@ def update_idea_status(
 ) -> dict[str, Any]:
     """Move an idea to a new status and return the updated row."""
     new_status = require_choice(status, STATUSES, "status")
-    cursor = conn.execute(
-        "UPDATE ideas SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (new_status, int(idea_id)),
-    )
+    if new_status == "completed":
+        cursor = conn.execute(
+            "UPDATE ideas SET status = ?, updated_at = CURRENT_TIMESTAMP, "
+            "completed_at = CASE WHEN completed_at IS NULL "
+            "THEN CURRENT_TIMESTAMP ELSE completed_at END WHERE id = ?",
+            (new_status, int(idea_id)),
+        )
+    elif new_status == "archived":
+        cursor = conn.execute(
+            "UPDATE ideas SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_status, int(idea_id)),
+        )
+    else:
+        cursor = conn.execute(
+            "UPDATE ideas SET status = ?, updated_at = CURRENT_TIMESTAMP, "
+            "completed_at = NULL WHERE id = ?",
+            (new_status, int(idea_id)),
+        )
     if cursor.rowcount == 0:
         raise LookupError(f"idea #{idea_id} not found")
     row = conn.execute("SELECT * FROM ideas WHERE id = ?", (int(idea_id),)).fetchone()
@@ -196,7 +217,7 @@ def update_idea(
     priority: str | None = None,
     tags: Iterable[str] | str | None = None,
 ) -> dict[str, Any]:
-    """Update an idea's fields and return the updated row."""
+    """Update an idea's fields and return the updated row (completed_at untouched)."""
     clauses: list[str] = ["updated_at = CURRENT_TIMESTAMP"]
     params: list[Any] = []
     if title is not None:

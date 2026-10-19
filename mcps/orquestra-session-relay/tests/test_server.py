@@ -9,6 +9,9 @@ from session_relay.server import server
 
 TOOLS = [
     "list_recent_sessions",
+    "pin_session",
+    "unpin_session",
+    "list_pinned_sessions",
     "inspect_session",
     "handoff_context",
     "search_sessions_history",
