@@ -102,6 +102,16 @@ def require_choice(value: object, allowed: tuple[str, ...], field: str) -> str:
     return text
 
 
+def clamp_limit(value: object, default: int, maximum: int | None = None) -> int:
+    """Coerce a limit to a sane int: garbage falls back to `default`, floor 1."""
+    try:
+        number = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        number = default
+    number = max(1, number)
+    return min(number, maximum) if maximum is not None else number
+
+
 def optional_choice(value: object, allowed: tuple[str, ...], field: str) -> str | None:
     """Normalize an optional filter value, treating empty/'all' as no filter."""
     if value is None:

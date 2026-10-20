@@ -6,7 +6,7 @@ import sqlite3
 from typing import Any
 
 from .serializers import note_dict
-from .store import require_text
+from .store import clamp_limit, require_text
 
 
 def _filters(
@@ -67,7 +67,7 @@ def read_board_notes(
     rows = conn.execute(
         f"SELECT * FROM blackboard_notes WHERE {' AND '.join(clauses)} "
         "ORDER BY created_at ASC, id ASC LIMIT ?",
-        (*params, max(1, int(limit))),
+        (*params, clamp_limit(limit, 200)),
     ).fetchall()
     notes = [note_dict(row) for row in rows]
     if mark_as_read and notes:

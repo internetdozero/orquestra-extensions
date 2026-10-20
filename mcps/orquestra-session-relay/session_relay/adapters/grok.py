@@ -14,7 +14,7 @@ from ..paths import (
     snippet,
 )
 from . import grok_events, grok_store
-from .base import SessionAdapter, limit_turns
+from .base import SessionAdapter, clamp_limit, limit_turns
 
 
 class GrokAdapter(SessionAdapter):
@@ -103,7 +103,7 @@ class GrokAdapter(SessionAdapter):
         )
 
     def list_sessions(self, limit: int = 5) -> list[SessionSummary]:
-        bound = max(1, int(limit))
+        bound = clamp_limit(limit, 5)
         merged: dict[str, SessionSummary] = {}
         for doc in self._docs():
             merged.setdefault(str(doc["session_id"]), self._summary(doc, str(doc["session_id"])))
@@ -180,7 +180,7 @@ class GrokAdapter(SessionAdapter):
                     "SELECT session_id, cwd, updated_at, title, content "
                     "FROM session_docs WHERE content LIKE ? OR title LIKE ? "
                     "ORDER BY updated_at DESC LIMIT ?",
-                    (f"%{needle}%", f"%{needle}%", max(1, int(limit))),
+                    (f"%{needle}%", f"%{needle}%", clamp_limit(limit, 10)),
                 ).fetchall()
             finally:
                 conn.close()

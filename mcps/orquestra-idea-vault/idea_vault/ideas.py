@@ -12,6 +12,7 @@ from .store import (
     CATEGORIES,
     PRIORITIES,
     STATUSES,
+    clamp_limit,
     optional_choice,
     require_choice,
     require_text,
@@ -138,7 +139,7 @@ def list_ideas(
     rows = conn.execute(
         f"SELECT * FROM ideas {where}ORDER BY {PRIORITY_RANK}, created_at DESC, id DESC "
         "LIMIT ?",
-        (*params, max(1, int(limit))),
+        (*params, clamp_limit(limit, 200)),
     ).fetchall()
     if compact:
         compact_ideas = [{f: row[f] for f in COMPACT_FIELDS} for row in rows]
@@ -171,7 +172,7 @@ def search_ideas(
     rows = conn.execute(
         f"SELECT * FROM ideas WHERE {' AND '.join(clauses)} "
         f"ORDER BY {PRIORITY_RANK}, created_at DESC, id DESC LIMIT ?",
-        (*params, max(1, int(limit))),
+        (*params, clamp_limit(limit, 50)),
     ).fetchall()
     ideas = [idea_dict(row) for row in rows]
     return {"query": text, "count": len(ideas), "ideas": ideas}

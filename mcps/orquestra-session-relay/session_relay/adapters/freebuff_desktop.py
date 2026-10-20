@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from ..models import Event, SearchHit, SessionSummary
+from .base import clamp_limit
 from ..paths import clip, iso_from_epoch_ms, snippet
 
 DESKTOP_PREFIX = "desktop:"
@@ -89,7 +90,7 @@ def list_desktop_threads(
     home: Path, harness: str, limit: int = 5
 ) -> list[SessionSummary]:
     """Newest desktop threads across project stores, newest first."""
-    bound = max(1, int(limit))
+    bound = clamp_limit(limit, 5)
     found: list[SessionSummary] = []
     for slug, db in desktop_databases(home):
         try:
@@ -204,7 +205,7 @@ def search_desktop_threads(
     home: Path, harness: str, needle: str, limit: int = 10
 ) -> list[SearchHit]:
     """Case-insensitive substring search over desktop message parts."""
-    bound = max(1, int(limit))
+    bound = clamp_limit(limit, 10)
     escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     hits: list[SearchHit] = []
     seen: set[str] = set()

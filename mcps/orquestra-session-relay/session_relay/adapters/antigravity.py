@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ..models import Event, SearchHit, SessionDetail, SessionSummary
 from ..paths import clip, iso_from_mtime, read_jsonl, snippet
-from .base import SessionAdapter, limit_turns
+from .base import SessionAdapter, clamp_limit, limit_turns
 
 _USER_REQUEST = re.compile(r"<USER_REQUEST>(.*?)(?:</USER_REQUEST>|<ADDITIONAL)", re.S)
 _FAILED_STATUSES = {"ERROR", "FAILED", "CANCELLED", "ABORTED"}
@@ -67,7 +67,7 @@ class AntigravityAdapter(SessionAdapter):
         )
 
     def list_sessions(self, limit: int = 5) -> list[SessionSummary]:
-        return [self._summarize(path) for path in self._transcripts()[: max(1, int(limit))]]
+        return [self._summarize(path) for path in self._transcripts()[: clamp_limit(limit, 5)]]
 
     def _events(self, path: Path) -> list[Event]:
         events: list[Event] = []
@@ -171,6 +171,6 @@ class AntigravityAdapter(SessionAdapter):
                     updated_at=summary.updated_at,
                 )
             )
-            if len(hits) >= max(1, int(limit)):
+            if len(hits) >= clamp_limit(limit, 10):
                 break
         return hits

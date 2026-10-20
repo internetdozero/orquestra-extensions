@@ -7,7 +7,7 @@ from typing import Any
 
 from ..models import Event, SearchHit, SessionDetail, SessionSummary
 from ..paths import clip, read_json, snippet
-from .base import SessionAdapter, limit_turns
+from .base import SessionAdapter, clamp_limit, limit_turns
 from .freebuff_desktop import (
     desktop_databases,
     desktop_events,
@@ -69,7 +69,7 @@ class FreebuffAdapter(SessionAdapter):
         )
 
     def list_sessions(self, limit: int = 5) -> list[SessionSummary]:
-        bound = max(1, int(limit))
+        bound = clamp_limit(limit, 5)
         sessions = [summarize_chat(path, self.id) for path in self._chat_files()]
         sessions.extend(list_desktop_threads(self.home, self.id, limit=bound))
         sessions.sort(key=lambda item: item.updated_at or "", reverse=True)
@@ -168,7 +168,7 @@ class FreebuffAdapter(SessionAdapter):
             return []
         hits: list[SearchHit] = []
         budget = 48 * 1024 * 1024
-        for path in self._chat_files()[: max(1, int(limit)) * 4]:
+        for path in self._chat_files()[: clamp_limit(limit, 10) * 4]:
             try:
                 budget -= min(path.stat().st_size, 12 * 1024 * 1024)
             except OSError:
@@ -196,12 +196,12 @@ class FreebuffAdapter(SessionAdapter):
                     updated_at=summary.updated_at,
                 )
             )
-            if len(hits) >= max(1, int(limit)):
+            if len(hits) >= clamp_limit(limit, 10):
                 break
         hits.extend(
-            search_desktop_threads(self.home, self.id, needle, limit)[: max(1, int(limit))]
+            search_desktop_threads(self.home, self.id, needle, limit)[: clamp_limit(limit, 10)]
         )
         hits.sort(key=lambda hit: hit.updated_at or "", reverse=True)
         if hits:
-            return hits[: max(1, int(limit))]
+            return hits[: clamp_limit(limit, 10)]
         return search_prompts(self.history_path, self._history(), needle, limit)

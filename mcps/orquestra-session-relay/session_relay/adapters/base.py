@@ -9,6 +9,16 @@ from .. import paths
 from ..models import Event, SearchHit, SessionDetail, SessionSummary
 
 
+def clamp_limit(value: object, default: int, maximum: int | None = None) -> int:
+    """Coerce a limit to a sane int: garbage falls back to `default`, floor 1."""
+    try:
+        number = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        number = default
+    number = max(1, number)
+    return min(number, maximum) if maximum is not None else number
+
+
 class SessionAdapter(ABC):
     """One harness's session store, read without ever writing to it."""
 

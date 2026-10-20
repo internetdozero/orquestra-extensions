@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ..models import SearchHit, SessionDetail, SessionSummary
 from ..paths import iso_from_epoch_ms, snippet
-from .base import SessionAdapter, limit_turns
+from .base import SessionAdapter, clamp_limit, limit_turns
 from .opencode_parts import events_for_session, matching_parts, parse
 
 
@@ -54,7 +54,7 @@ class OpenCodeAdapter(SessionAdapter):
                 rows = conn.execute(
                     "SELECT id, title, directory, time_updated FROM session "
                     "WHERE parent_id IS NULL ORDER BY time_updated DESC LIMIT ?",
-                    (max(1, int(limit)),),
+                    (clamp_limit(limit, 5),),
                 ).fetchall()
                 return [self._summary(conn, row) for row in rows]
             finally:
@@ -98,7 +98,7 @@ class OpenCodeAdapter(SessionAdapter):
             try:
                 hits: list[SearchHit] = []
                 seen: set[str] = set()
-                for row in matching_parts(conn, needle, max(1, int(limit)) * 5):
+                for row in matching_parts(conn, needle, clamp_limit(limit, 10) * 5):
                     if row["session_id"] in seen:
                         continue
                     data = parse(row["data"])
@@ -117,7 +117,7 @@ class OpenCodeAdapter(SessionAdapter):
                             updated_at=iso_from_epoch_ms(row["time_updated"]),
                         )
                     )
-                    if len(hits) >= max(1, int(limit)):
+                    if len(hits) >= clamp_limit(limit, 10):
                         break
                 return hits
             finally:

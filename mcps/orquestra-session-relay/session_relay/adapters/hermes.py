@@ -14,7 +14,7 @@ from typing import Any
 
 from ..models import Event, SearchHit, SessionDetail, SessionSummary
 from ..paths import clip, iso_from_epoch_seconds, read_json, snippet
-from .base import SessionAdapter, limit_turns
+from .base import SessionAdapter, clamp_limit, limit_turns
 
 SESSION_COLS = "id, display_name, started_at, ended_at, message_count"
 
@@ -72,7 +72,7 @@ class HermesAdapter(SessionAdapter):
         )
 
     def list_sessions(self, limit: int = 5) -> list[SessionSummary]:
-        bound = max(1, int(limit))
+        bound = clamp_limit(limit, 5)
         if self.db_path.is_file():
             try:
                 conn = self._connect()
@@ -201,7 +201,7 @@ class HermesAdapter(SessionAdapter):
                     "SELECT m.session_id, m.content, s.display_name, s.ended_at "
                     "FROM messages m LEFT JOIN sessions s ON s.id = m.session_id "
                     "WHERE m.content LIKE ? ORDER BY m.timestamp DESC LIMIT ?",
-                    (f"%{needle}%", max(1, int(limit)) * 5),
+                    (f"%{needle}%", clamp_limit(limit, 10) * 5),
                 ).fetchall()
             finally:
                 conn.close()
@@ -226,7 +226,7 @@ class HermesAdapter(SessionAdapter):
                     updated_at=iso_from_epoch_seconds(row["ended_at"]),
                 )
             )
-            if len(hits) >= max(1, int(limit)):
+            if len(hits) >= clamp_limit(limit, 10):
                 break
         return hits
 

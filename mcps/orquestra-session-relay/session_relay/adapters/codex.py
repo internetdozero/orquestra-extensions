@@ -14,7 +14,7 @@ from ..paths import (
     read_jsonl,
     snippet,
 )
-from .base import SessionAdapter, limit_turns, sort_events
+from .base import SessionAdapter, clamp_limit, limit_turns, sort_events
 from .codex_items import escape_like, item_events, message_text
 
 
@@ -79,7 +79,7 @@ class CodexAdapter(SessionAdapter):
                     "MAX(COALESCE(completed_at, started_at)) AS last_at "
                     "FROM thread_turns GROUP BY thread_id "
                     "ORDER BY last_at DESC LIMIT ?",
-                    (max(1, int(limit)),),
+                    (clamp_limit(limit, 5),),
                 ).fetchall()
                 return [self._summary(conn, row) for row in rows]
             finally:
@@ -152,7 +152,7 @@ class CodexAdapter(SessionAdapter):
                     "WHERE item_type IN ('userMessage', 'agentMessage') "
                     "AND item_json LIKE ? ESCAPE '\\' "
                     "ORDER BY created_at_ms DESC LIMIT ?",
-                    (pattern, max(1, int(limit)) * 6),
+                    (pattern, clamp_limit(limit, 10) * 6),
                 ).fetchall()
                 hits: list[SearchHit] = []
                 seen: set[str] = set()
@@ -180,7 +180,7 @@ class CodexAdapter(SessionAdapter):
                             ),
                         )
                     )
-                    if len(hits) >= max(1, int(limit)):
+                    if len(hits) >= clamp_limit(limit, 10):
                         break
                 return hits
             finally:

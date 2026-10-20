@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..models import Event, SearchHit, SessionSummary
+from .base import clamp_limit
 from ..paths import clip, iso_from_epoch_ms, iso_from_mtime, read_json, snippet
 
 LARGE_BYTES = 16 * 1024 * 1024
@@ -141,7 +142,7 @@ def search_prompts(
                 updated_at=iso_from_mtime(history_path),
             )
         )
-        if len(hits) >= max(1, int(limit)):
+        if len(hits) >= clamp_limit(limit, 10):
             break
     return hits
 

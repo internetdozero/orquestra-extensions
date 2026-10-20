@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from . import discovery
+from .adapters.base import clamp_limit
 from .handoff import extract_files
 from .models import Event
 from .paths import clip
@@ -208,7 +209,7 @@ def tail_agent_activity(
     harness: str | None = None, session_id: str | None = None, limit: int = 5
 ) -> dict[str, Any]:
     """Return the last `limit` turns/events of a target session with summary text."""
-    bound_limit = max(1, min(int(limit), 50))
+    bound_limit = clamp_limit(limit, 5, 50)
     target_harness, target_id, error = _resolve_target(harness, session_id)
     if error:
         return {

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from ..models import Event, SearchHit, SessionDetail, SessionSummary
 from ..paths import clip, snippet
-from .base import SessionAdapter, limit_turns
+from .base import SessionAdapter, clamp_limit, limit_turns
 
 SESSION_COLS = "id, cwd, repository, summary, created_at, updated_at"
 
@@ -73,7 +73,7 @@ class CopilotAdapter(SessionAdapter):
                 rows = conn.execute(
                     f"SELECT {SESSION_COLS} FROM sessions "
                     "ORDER BY updated_at DESC LIMIT ?",
-                    (max(1, int(limit)),),
+                    (clamp_limit(limit, 5),),
                 ).fetchall()
                 return [self._summary(conn, row) for row in rows]
             finally:
@@ -150,7 +150,7 @@ class CopilotAdapter(SessionAdapter):
                     "ON s.id = t.session_id WHERE t.user_message LIKE ? "
                     "OR t.assistant_response LIKE ? OR s.summary LIKE ? "
                     "ORDER BY s.updated_at DESC LIMIT ?",
-                    (pattern, pattern, pattern, max(1, int(limit)) * 5),
+                    (pattern, pattern, pattern, clamp_limit(limit, 10) * 5),
                 ).fetchall()
             finally:
                 conn.close()
@@ -182,6 +182,6 @@ class CopilotAdapter(SessionAdapter):
                     updated_at=row["updated_at"],
                 )
             )
-            if len(hits) >= max(1, int(limit)):
+            if len(hits) >= clamp_limit(limit, 10):
                 break
         return hits

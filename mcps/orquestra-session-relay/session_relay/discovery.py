@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .adapters import build_adapters, canonical_harness
+from .adapters.base import clamp_limit
 from .models import SessionSummary
 
 KNOWN = (
@@ -44,7 +45,7 @@ def recent_sessions(
     harness: str | None = None, limit: int = 5
 ) -> tuple[list[SessionSummary], list[str]]:
     """Merge the newest sessions across harnesses, newest first."""
-    limit = max(1, min(int(limit), 50))
+    limit = clamp_limit(limit, 5, 50)
     warnings: list[str] = []
     found: list[SessionSummary] = []
     for adapter in adapters_for(harness):

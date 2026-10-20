@@ -9,6 +9,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 
 from . import discovery, handoff, policy, watch
+from .adapters.base import clamp_limit
 
 INSTRUCTIONS = """Read-only session relay for AI coding harnesses on this machine.
 
@@ -33,11 +34,7 @@ server = MCPServer(
 
 
 def _bounds(value: int, default: int, maximum: int) -> int:
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
-        number = default
-    return max(1, min(number, maximum))
+    return clamp_limit(value, default, maximum)
 
 
 @server.tool(
