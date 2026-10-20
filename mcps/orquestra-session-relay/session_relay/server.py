@@ -8,7 +8,8 @@ from typing import Any
 
 from mcp.server.mcpserver import MCPServer
 
-from . import discovery, handoff, policy, watch
+from . import audit, discovery, handoff, policy, watch
+from .compact import compact_row, compact_session
 from .adapters.base import clamp_limit
 
 INSTRUCTIONS = """Read-only session relay for AI coding harnesses on this machine.
@@ -41,7 +42,7 @@ def _bounds(value: int, default: int, maximum: int) -> int:
     description="List recent sessions across all 9 harnesses (newest first); pinned sessions show is_pinned."
 )
 def list_recent_sessions(
-    harness: str | None = None, limit: int = 5
+    harness: str | None = None, limit: int = 5, compact: bool = False
 ) -> dict[str, Any]:
     """Discover recent sessions; omit harness to merge every supported store."""
     try:
@@ -49,6 +50,13 @@ def list_recent_sessions(
     except ValueError as error:
         return {"count": 0, "sessions": [], "warnings": [], "error": str(error)}
     sessions = policy.decorate(sessions)
+    if compact:
+        return {
+            "count": len(sessions),
+            "sessions": [compact_row(session) for session in sessions],
+            "warnings": warnings,
+            "compact": True,
+        }
     return {
         "count": len(sessions),
         "sessions": [session.as_dict() for session in sessions],
@@ -116,7 +124,10 @@ def _find_harness_for(session_id: str, skip: str | None = None) -> str | None:
     description="Read a session's ordered conversation and tool events. session_id defaults to the newest one; harness is inferred from desktop:/claude:/codex: prefixes or searched across harnesses when omitted."
 )
 def inspect_session(
-    harness: str | None = None, session_id: str = "latest", max_turns: int = 10
+    harness: str | None = None,
+    session_id: str = "latest",
+    max_turns: int = 10,
+    compact: bool = False,
 ) -> dict[str, Any]:
     """Inspect one session; max_turns keeps only the most recent user turns."""
     resolved = (harness or "").strip() or None
@@ -161,6 +172,10 @@ def inspect_session(
             "hint": "Call list_recent_sessions(harness='%s') for valid ids." % adapter.id,
             "events": [],
         }
+    if compact:
+        payload = compact_session(detail)
+        payload["compact"] = True
+        return payload
     payload = detail.as_dict(max_text=2000)
     payload["harness"] = adapter.id
     return payload
@@ -225,9 +240,13 @@ def search_sessions_history(
 @server.tool(
     description="Watch the active coding agent session, status (running/idle), last turn, and touched files."
 )
-def watch_active_agent(project_path: str | None = None) -> dict[str, Any]:
+def watch_active_agent(
+    project_path: str | None = None,
+    harness: str | None = None,
+    exclude_harness: str | None = None,
+) -> dict[str, Any]:
     """Observe live agent activity and whether an agent is actively running."""
-    return watch.watch_active_agent(project_path)
+    return watch.watch_active_agent(project_path, harness, exclude_harness)
 
 
 @server.tool(
@@ -238,6 +257,14 @@ def tail_agent_activity(
 ) -> dict[str, Any]:
     """Get the latest events of a session without loading megabytes of payload."""
     return watch.tail_agent_activity(harness, session_id, limit)
+
+
+@server.tool(
+    description="Lean orchestrator telemetry: liveness, current turn, git worktree state."
+)
+def audit_agent(harness: str, session_id: str | None = None) -> dict[str, Any]:
+    """Audit one agent thread without loading its full transcript."""
+    return audit.audit_agent(harness, session_id)
 
 
 def main(argv: list[str] | None = None) -> int:

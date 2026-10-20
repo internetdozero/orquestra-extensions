@@ -14,6 +14,7 @@ from .freebuff_desktop import (
     find_desktop_thread,
     list_desktop_threads,
     load_desktop_messages,
+    read_turn_liveness,
     search_desktop_threads,
     split_desktop_id,
     summarize_desktop_thread,
@@ -106,7 +107,8 @@ class FreebuffAdapter(SessionAdapter):
         if found is None:
             return None
         slug, db, row = found
-        with_desktop_counts = summarize_desktop_thread(slug, db, row, self.id)
+        live = read_turn_liveness(db, thread_id)
+        with_desktop_counts = summarize_desktop_thread(slug, db, row, self.id, live=live)
         rows = load_desktop_messages(db, thread_id)
         if not rows and not str(row.get("title") or ""):
             return None
@@ -119,6 +121,9 @@ class FreebuffAdapter(SessionAdapter):
             turns_count=users,
             project=with_desktop_counts.project,
             source=with_desktop_counts.source,
+            status=with_desktop_counts.status,
+            turn_state=with_desktop_counts.turn_state,
+            alive_seconds_ago=with_desktop_counts.alive_seconds_ago,
         )
         return SessionDetail(
             summary=summary,

@@ -20,6 +20,9 @@ class SessionSummary:
     is_pinned: bool = False
     pin_label: str | None = None
     session_kind: str | None = None
+    status: str | None = None
+    turn_state: str | None = None
+    alive_seconds_ago: float | None = None
 
     @property
     def id(self) -> str:
@@ -38,6 +41,9 @@ class SessionSummary:
             is_pinned=True,
             pin_label=label,
             session_kind=self.session_kind,
+            status=self.status,
+            turn_state=self.turn_state,
+            alive_seconds_ago=self.alive_seconds_ago,
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -52,7 +58,23 @@ class SessionSummary:
             "is_pinned": self.is_pinned,
             "pin_label": self.pin_label,
             "session_kind": self.session_kind,
+            "status": self.status,
+            "turn_state": self.turn_state,
+            "alive_seconds_ago": self.alive_seconds_ago,
         }
+
+
+def session_is_live(summary: "SessionSummary", window_seconds: int = 120) -> bool:
+    """True when a harness reports a fresh running turn heartbeat."""
+    if (summary.turn_state or "").strip().lower() != "running":
+        return False
+    if summary.alive_seconds_ago is None:
+        return False
+    try:
+        age = float(summary.alive_seconds_ago)
+    except (TypeError, ValueError):
+        return False
+    return 0 <= age <= window_seconds
 
 
 @dataclass(frozen=True)

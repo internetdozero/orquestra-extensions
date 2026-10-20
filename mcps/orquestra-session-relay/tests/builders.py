@@ -180,7 +180,8 @@ def make_freebuff_desktop(
         CREATE TABLE threads (
             id TEXT PRIMARY KEY, project_id TEXT NOT NULL,
             project_path TEXT NOT NULL, title TEXT NOT NULL DEFAULT 'New thread',
-            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+            created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+            turn_state TEXT, turn_alive_at INTEGER
         );
         CREATE TABLE messages (
             seq INTEGER PRIMARY KEY AUTOINCREMENT, thread_id TEXT NOT NULL,
@@ -191,7 +192,7 @@ def make_freebuff_desktop(
     )
     for thread in threads:
         conn.execute(
-            "INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO threads VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 thread["id"],
                 "project-1",
@@ -199,6 +200,8 @@ def make_freebuff_desktop(
                 thread.get("title", ""),
                 thread.get("created", 1_790_000_000_000),
                 thread.get("updated", 1_790_000_000_000),
+                thread.get("turn_state"),
+                thread.get("turn_alive_at"),
             ),
         )
         for message in thread.get("messages", []):

@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any
 
 from . import discovery
+from .adapters import canonical_harness
 from .adapters.base import clamp_limit
 from .handoff import extract_files
-from .models import Event
+from .models import Event, session_is_live
 from .paths import clip
 
 _REL_PATH = re.compile(
@@ -113,24 +114,37 @@ def _build_last_turn(events: list[Event]) -> tuple[dict[str, Any] | None, list[E
     }, turn_events
 
 
-def watch_active_agent(project_path: str | None = None) -> dict[str, Any]:
-    """Inspect recent sessions to observe active agent activity and status."""
-    sessions, _ = discovery.recent_sessions(limit=50)
+def _idle_result(project_path: str | None, error: str | None = None) -> dict[str, Any]:
+    """Inactive-watch payload, carrying an error note when filtering failed."""
+    payload: dict[str, Any] = {
+        "active": False, "harness": None, "session_id": None, "title": None,
+        "project": project_path, "updated_at": None, "status": "idle",
+        "last_turn": None, "files_touched": [],
+    }
+    if error is not None:
+        payload["error"] = error
+    return payload
+
+
+def watch_active_agent(
+    project_path: str | None = None,
+    harness: str | None = None,
+    exclude_harness: str | None = None,
+) -> dict[str, Any]:
+    """Observe active agent activity; `exclude_harness` hides own sessions."""
+    wanted = canonical_harness(harness).strip() if harness else None
+    skipped = canonical_harness(exclude_harness).strip() if exclude_harness else None
+    try:
+        sessions, _ = discovery.recent_sessions(harness=wanted, limit=50)
+    except ValueError as error:
+        return _idle_result(project_path, str(error))
+    if skipped:
+        sessions = [s for s in sessions if canonical_harness(s.harness) != skipped]
     if project_path:
         sessions = [s for s in sessions if _matches_project(s.project, project_path)]
 
     if not sessions:
-        return {
-            "active": False,
-            "harness": None,
-            "session_id": None,
-            "title": None,
-            "project": project_path,
-            "updated_at": None,
-            "status": "idle",
-            "last_turn": None,
-            "files_touched": [],
-        }
+        return _idle_result(project_path)
 
     session = sessions[0]
     detail = None
@@ -154,7 +168,9 @@ def watch_active_agent(project_path: str | None = None) -> dict[str, Any]:
         "title": session.title,
         "project": session.project,
         "updated_at": _iso_str(session.updated_at),
-        "status": "running" if _is_running(session.updated_at) else "idle",
+        "status": "running"
+        if session_is_live(session) or _is_running(session.updated_at)
+        else "idle",
         "last_turn": last_turn,
         "files_touched": files_touched,
     }

@@ -17,6 +17,7 @@ TOOLS = [
     "search_sessions_history",
     "watch_active_agent",
     "tail_agent_activity",
+    "audit_agent",
 ]
 
 

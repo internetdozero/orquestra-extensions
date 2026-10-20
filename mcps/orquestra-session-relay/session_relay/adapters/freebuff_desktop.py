@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -28,6 +29,42 @@ UUID_RE = re.compile(
 _INTERNAL_PARTS = frozenset({"reasoning", "ad", "changes"})
 
 THREAD_COLS = "id, title, project_path, created_at, updated_at"
+
+LIVENESS_WINDOW_MS = 120_000
+LIVENESS_COLS = ("turn_state", "turn_alive_at")
+
+
+def read_turn_liveness(
+    db: Path, thread_id: str, now_ms: int | None = None
+) -> dict[str, Any] | None:
+    """Fresh turn heartbeat; None when unknown or the columns predate the store."""
+    try:
+        current = int(time.time() * 1000) if now_ms is None else int(now_ms)
+    except (TypeError, ValueError):
+        return None
+    try:
+        with _open_ro(db) as conn:
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(threads)")}
+            if not set(LIVENESS_COLS) <= cols:
+                return None
+            row = conn.execute(
+                "SELECT turn_state, turn_alive_at FROM threads WHERE id = ?",
+                (thread_id,),
+            ).fetchone()
+    except (sqlite3.Error, OSError):
+        return None
+    if row is None:
+        return None
+    state = str(row["turn_state"] or "").strip().lower() or None
+    try:
+        alive_ms = int(row["turn_alive_at"]) if row["turn_alive_at"] is not None else None
+    except (TypeError, ValueError):
+        alive_ms = None
+    age = (current - alive_ms) / 1000.0 if alive_ms is not None else None
+    return {
+        "turn_state": state, "alive_seconds_ago": age,
+        "running": state == "running" and age is not None and 0 <= age <= LIVENESS_WINDOW_MS / 1000,
+    }
 
 
 def split_desktop_id(session_id: str) -> tuple[str | None, str | None] | None:
@@ -72,9 +109,15 @@ def _open_ro(db: Path) -> Iterator[sqlite3.Connection]:
 
 
 def summarize_desktop_thread(
-    slug: str, db: Path, row: dict[str, Any], harness: str, turns: int = 0
+    slug: str,
+    db: Path,
+    row: dict[str, Any],
+    harness: str,
+    turns: int = 0,
+    live: dict[str, Any] | None = None,
 ) -> SessionSummary:
     title = str(row.get("title") or "").strip()
+    live = live or {}
     return SessionSummary(
         harness=harness,
         session_id=f"{DESKTOP_PREFIX}{slug}:{row['id']}",
@@ -83,6 +126,9 @@ def summarize_desktop_thread(
         turns_count=turns,
         project=str(row.get("project_path") or "") or None,
         source=str(db),
+        status="running" if live.get("running") else None,
+        turn_state=live.get("turn_state"),
+        alive_seconds_ago=live.get("alive_seconds_ago"),
     )
 
 
@@ -103,8 +149,9 @@ def list_desktop_threads(
                 ).fetchall()
         except (sqlite3.Error, OSError):
             continue
+        live = {str(row["id"]): read_turn_liveness(db, str(row["id"])) for row in rows}
         found.extend(
-            summarize_desktop_thread(slug, db, dict(row), harness, int(row["turns"]))
+            summarize_desktop_thread(slug, db, dict(row), harness, int(row["turns"]), live[str(row["id"])])
             for row in rows
         )
     found.sort(key=lambda item: item.updated_at or "", reverse=True)
