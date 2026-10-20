@@ -7,6 +7,7 @@ Used when no API token is configured, or when a project's ``wrangler.toml`` /
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -138,9 +139,6 @@ def wrangler_binary() -> str | None:
     local_cwd = Path.cwd() / "node_modules" / ".bin" / "wrangler"
     if local_cwd.is_file() and os.access(local_cwd, os.X_OK):
         return str(local_cwd)
-    sintonia_node = Path.home() / "Persistente" / "Coding" / "sites" / "sintonia" / "node_modules" / ".bin" / "wrangler"
-    if sintonia_node.is_file() and os.access(sintonia_node, os.X_OK):
-        return str(sintonia_node)
     return shutil.which("npx")
 
 
