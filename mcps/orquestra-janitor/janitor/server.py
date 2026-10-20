@@ -12,8 +12,9 @@ from . import caches, health, oom, orphans, sweep
 
 INSTRUCTIONS = """Linux housekeeping for agentic workspaces, local-only and read-mostly.
 
-janitor_system_health reports RAM/swap/tmpfs use, CPU load, the top-5 RSS
-processes, and alert=true past 85% RAM or 80% /tmp.
+janitor_system_health reports RAM/swap/tmpfs use, CPU load, cpu.temperature_c,
+the top-5 RSS processes, alert=true past 85% RAM or 80% /tmp, and
+thermal_alert=true past 82°C.
 
 janitor_scan_orphans lists this user's suspected orphaned dev workers
 (headless browsers, dead agent runners, detached compilers) with reasons.
@@ -50,8 +51,9 @@ def _guarded(action: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
 @server.tool(
     description=(
         "RAM/swap/tmpfs health: used/free RAM and swap, /tmp tmpfs utilization, "
-        "CPU load and the top-5 processes by resident memory. alert=true past "
-        "85% RAM or 80% /tmp."
+        "CPU load, cpu.temperature_c from the hottest thermal zone, and the "
+        "top-5 processes by resident memory. alert=true past 85% RAM or 80% "
+        "/tmp. thermal_alert=true when cpu.temperature_c exceeds 82°C."
     )
 )
 def janitor_system_health() -> dict[str, Any]:
