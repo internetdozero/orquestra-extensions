@@ -19,6 +19,7 @@ class SessionSummary:
     source: str | None = None
     is_pinned: bool = False
     pin_label: str | None = None
+    session_kind: str | None = None
 
     @property
     def id(self) -> str:
@@ -36,6 +37,7 @@ class SessionSummary:
             source=self.source,
             is_pinned=True,
             pin_label=label,
+            session_kind=self.session_kind,
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -49,6 +51,7 @@ class SessionSummary:
             "source": self.source,
             "is_pinned": self.is_pinned,
             "pin_label": self.pin_label,
+            "session_kind": self.session_kind,
         }
 
 

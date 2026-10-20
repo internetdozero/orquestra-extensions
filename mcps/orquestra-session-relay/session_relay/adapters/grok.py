@@ -1,4 +1,4 @@
-"""Read-only adapter for xAI Grok session search and prompt history."""
+"""Read-only adapter for xAI Grok sessions, prompts and disk-only subagents."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from ..paths import (
     read_jsonl,
     snippet,
 )
+from . import grok_events, grok_store
 from .base import SessionAdapter, limit_turns
 
 
@@ -29,13 +30,25 @@ class GrokAdapter(SessionAdapter):
         return self.sessions_root / "session_search.sqlite"
 
     def available(self) -> bool:
-        return self.search_db.is_file() or any(self.sessions_root.glob("*/prompt_history.jsonl"))
+        return self.search_db.is_file() or bool(self._dirs())
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(f"file:{self.search_db}?mode=ro", uri=True, timeout=5.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA query_only=ON")
         return conn
+
+    def _dirs(self) -> dict[str, Path]:
+        """session_id -> folder for project sessions and nested subagents."""
+        if not hasattr(self, "_session_dirs"):
+            self._session_dirs = grok_store.session_dirs(self.sessions_root)
+        return self._session_dirs
+
+    def _find_session_dir(self, session_id: str) -> Path | None:
+        """Locate an unindexed session folder without leaving the store."""
+        if not grok_store.safe_session_id(session_id):
+            return None
+        return self._dirs().get(session_id)
 
     def _prompt_index(self) -> dict[str, list[dict[str, Any]]]:
         """session_id -> prompt records, built once per adapter instance."""
@@ -67,6 +80,9 @@ class GrokAdapter(SessionAdapter):
             return []
 
     def _summary(self, doc: sqlite3.Row | None, session_id: str) -> SessionSummary:
+        directory = self._find_session_dir(session_id)
+        if doc is None and directory is not None:
+            return grok_store.summary(directory, self.sessions_root, session_id)
         prompts = self._prompt_index().get(session_id, [])
         title = str(doc["title"] or "") if doc is not None else ""
         if not title and prompts:
@@ -87,17 +103,33 @@ class GrokAdapter(SessionAdapter):
         )
 
     def list_sessions(self, limit: int = 5) -> list[SessionSummary]:
-        docs = self._docs()[: max(1, int(limit))]
-        if docs:
-            return [self._summary(doc, str(doc["session_id"])) for doc in docs]
-        sessions = [
-            (self._summary(None, session_id), session_id)
-            for session_id in self._prompt_index()
-        ]
-        sessions.sort(key=lambda item: item[0].updated_at or "", reverse=True)
-        return [summary for summary, _ in sessions[: max(1, int(limit))]]
+        bound = max(1, int(limit))
+        merged: dict[str, SessionSummary] = {}
+        for doc in self._docs():
+            merged.setdefault(str(doc["session_id"]), self._summary(doc, str(doc["session_id"])))
+        for session_id, directory in self._dirs().items():
+            if session_id not in merged:
+                merged[session_id] = grok_store.summary(
+                    directory, self.sessions_root, session_id
+                )
+        for session_id in self._prompt_index():
+            merged.setdefault(session_id, self._summary(None, session_id))
+        sessions = sorted(
+            merged.values(), key=lambda item: item.updated_at or "", reverse=True
+        )
+        return sessions[:bound]
 
     def _events(self, session_id: str) -> list[Event]:
+        directory = self._find_session_dir(session_id)
+        if directory is not None:
+            chat = grok_store.chat_path(directory, self.sessions_root)
+            if chat is not None:
+                events = grok_events.chat_events(chat)
+                if events:
+                    return events
+            events = grok_events.subagent_events(directory, self.sessions_root)
+            if events:
+                return events
         records = self._prompt_index().get(session_id, [])
         if records:
             return [
@@ -126,7 +158,11 @@ class GrokAdapter(SessionAdapter):
                 return None
             session_id = sessions[0].session_id
         doc = next((row for row in self._docs() if row["session_id"] == session_id), None)
-        if doc is None and session_id not in self._prompt_index():
+        if (
+            doc is None
+            and session_id not in self._prompt_index()
+            and self._find_session_dir(session_id) is None
+        ):
             return None
         return SessionDetail(
             summary=self._summary(doc, session_id),

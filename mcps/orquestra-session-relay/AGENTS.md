@@ -20,6 +20,8 @@ Group by capability. The entry point only wires modules. A shared module exists 
 - `session_relay/server.py` — MCP entrypoint and the four tool registrations.
 - `session_relay/adapters/base.py` — adapter interface and JSONL/turn helpers.
 - `session_relay/adapters/{codex,claude,antigravity,opencode,freebuff,grok}.py` — one read-only adapter per harness storage format.
+- `session_relay/adapters/grok_store.py` — Grok folder/subagent discovery and summary metadata.
+- `session_relay/adapters/grok_events.py` — Grok chat-history and subagent event mapping.
 - `session_relay/adapters/codex_items.py` — Codex thread-item to event mapping.
 - `session_relay/adapters/opencode_parts.py` — OpenCode message/part to event mapping.
 - `session_relay/adapters/freebuff_store.py` — bounded readers for very large Freebuff chat JSON.
