@@ -10,7 +10,7 @@ The literals mirror ``store.CATEGORIES``/``PRIORITIES``/``STATUSES``;
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,19 @@ Priority = Literal["low", "medium", "high", "critical"]
 Status = Literal["open", "in_progress", "completed", "archived"]
 # Listing accepts the stored statuses plus "all" for an unfiltered scan.
 StatusFilter = Literal["open", "in_progress", "completed", "archived", "all"]
+
+# One dispatch contract shared by every tool that accepts a Builder prompt, so
+# the guidance reaches the client schema instead of living only in a skill file.
+BuilderDispatch = Annotated[
+    str | None,
+    Field(
+        description=(
+            "Compact English Builder dispatch prompt (Mission, Workspace, Targets, "
+            "Scope, Idea Vault Lifecycle hooks, Verification). Avoid redundant "
+            "guardrails."
+        )
+    ),
+]
 
 
 class IdeaInput(BaseModel):
@@ -30,6 +43,4 @@ class IdeaInput(BaseModel):
     priority: Priority = "medium"
     tags: list[str] | None = None
     status: Status = "open"
-    prompt: str | None = Field(
-        None, description="Builder prompt: the instruction handed to the implementer."
-    )
+    prompt: BuilderDispatch = None

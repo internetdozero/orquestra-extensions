@@ -10,7 +10,14 @@ from mcp.server.mcpserver import MCPServer
 
 from . import blackboard, ideas
 from .errors import actionable
-from .schema import Category, IdeaInput, Priority, Status, StatusFilter
+from .schema import (
+    BuilderDispatch,
+    Category,
+    IdeaInput,
+    Priority,
+    Status,
+    StatusFilter,
+)
 from .store import ENV_DB_PATH, configure, get_database
 
 INSTRUCTIONS = """Local idea vault and inter-agent blackboard backed by one SQLite file.
@@ -48,9 +55,13 @@ def record_idea(
     category: Category = "feature",
     priority: Priority = "medium",
     tags: list[str] | None = None,
-    prompt: str | None = None,
+    prompt: BuilderDispatch = None,
 ) -> dict[str, Any]:
-    """Record an idea. category: feature|architecture|bug|ux|idea, priority: low|medium|high|critical."""
+    """Record an idea. category: feature|architecture|bug|ux|idea, priority: low|medium|high|critical.
+
+    prompt carries the compact English Builder dispatch, not a restatement of rules
+    already enforced by AGENTS.md.
+    """
     with get_database() as conn:
         return ideas.record_idea(
             conn, project, title, description, category, priority, tags,
@@ -108,9 +119,12 @@ def update_idea(
     category: Category | None = None,
     priority: Priority | None = None,
     tags: list[str] | None = None,
-    prompt: str | None = None,
+    prompt: BuilderDispatch = None,
 ) -> dict[str, Any]:
-    """Update an existing idea's fields by id."""
+    """Update an existing idea's fields by id. None leaves every field untouched.
+
+    prompt replaces the Builder dispatch with the same compact English contract.
+    """
     with get_database() as conn:
         return ideas.update_idea(
             conn, idea_id, title, description, category, priority, tags, prompt

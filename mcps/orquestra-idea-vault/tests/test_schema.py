@@ -66,6 +66,18 @@ def test_batch_items_publish_the_same_enums() -> None:
     assert _enum(item["status"]) == list(STATUSES)
 
 
+def test_prompt_publishes_the_builder_dispatch_contract() -> None:
+    expected = (
+        "Compact English Builder dispatch prompt (Mission, Workspace, Targets, "
+        "Scope, Idea Vault Lifecycle hooks, Verification). Avoid redundant guardrails."
+    )
+    for tool in ("record_idea", "update_idea"):
+        assert _schema(tool)["properties"]["prompt"]["description"] == expected
+
+    item = _schema("record_ideas_batch")["$defs"]["IdeaInput"]
+    assert item["properties"]["prompt"]["description"] == expected
+
+
 def test_invalid_category_names_the_accepted_values() -> None:
     with pytest.raises(ToolError) as caught:
         _call("record_idea", project="OrquestraAI", title="x", category="nope")
