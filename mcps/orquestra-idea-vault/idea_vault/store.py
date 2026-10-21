@@ -16,6 +16,15 @@ PRIORITIES = ("low", "medium", "high", "critical")
 STATUSES = ("open", "in_progress", "completed", "archived")
 ACTIVE_STATUSES = ("open", "in_progress")
 
+
+class MissingIdea(LookupError):
+    """The requested idea id does not exist in the vault.
+
+    A dedicated type so a tool can report it instead of a traceback, and so a
+    stray ``KeyError`` or ``IndexError`` from a bug is never mistaken for one.
+    """
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS ideas (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
     "Typing :: Typed",
 ]
-dependencies = ["mcp>=2.3.0"]
+dependencies = ["mcp>=2.3.0", "pydantic>=2"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

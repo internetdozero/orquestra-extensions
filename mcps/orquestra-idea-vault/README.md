@@ -124,6 +124,12 @@ Allowed values: `category` is `feature`, `architecture`, `bug`, `ux` or `idea`;
 `in_progress`, `completed` or `archived`. `tags` accepts a list or a
 comma-separated string and is stored as JSON.
 
+Those three fields ship as JSON-schema enums in every tool signature, so a
+client sees the accepted values before calling. A rejected value comes back as
+a tool error that names the field and the options (for example
+`status: Input should be 'open', 'in_progress', 'completed' or 'archived'`),
+never as a bare `Error executing tool`.
+
 ## Example workflow
 
 ```text

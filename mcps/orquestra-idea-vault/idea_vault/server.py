@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any
+from typing import Any, Callable
 
 from mcp.server.mcpserver import MCPServer
 
 from . import blackboard, ideas
+from .errors import actionable
+from .schema import Category, IdeaInput, Priority, Status, StatusFilter
 from .store import ENV_DB_PATH, configure, get_database
 
 INSTRUCTIONS = """Local idea vault and inter-agent blackboard backed by one SQLite file.
@@ -17,6 +19,10 @@ Use the idea tools to capture thoughts without leaving the terminal, and the
 board tools to leave asynchronous notes for other agents working concurrently:
 post with post_board_note, then read_board_notes with unread_only to pick up
 what is waiting for you. Call read_board_notes(mark_as_read=True) once handled.
+
+category, priority and status are closed sets, and their accepted values are
+published in each tool's schema. A rejected value returns the error text with
+the accepted options, so read it instead of retrying with a guess.
 """
 
 server = MCPServer(
@@ -27,15 +33,20 @@ server = MCPServer(
 )
 
 
-@server.tool(
+def tool(*, description: str) -> Callable[[Callable[..., Any]], Any]:
+    """Register a tool whose anticipated failures reach the caller verbatim."""
+    return lambda fn: server.tool(description=description)(actionable(fn))
+
+
+@tool(
     description="Capture a new idea in the local vault. Returns the stored idea with its id."
 )
 def record_idea(
     project: str,
     title: str,
     description: str = "",
-    category: str = "feature",
-    priority: str = "medium",
+    category: Category = "feature",
+    priority: Priority = "medium",
     tags: list[str] | None = None,
     prompt: str | None = None,
 ) -> dict[str, Any]:
@@ -47,26 +58,28 @@ def record_idea(
         )
 
 
-@server.tool(
+@tool(
     description="Bulk insert multiple ideas for a project in a single transaction."
 )
 def record_ideas_batch(
     project: str,
-    items: list[dict[str, Any]],
+    items: list[IdeaInput],
 ) -> dict[str, Any]:
-    """Record multiple ideas atomically. Each item can include title, description, category, priority, tags, and prompt."""
+    """Record multiple ideas atomically. Each item can include title, description, category, priority, tags, status, and prompt."""
     with get_database() as conn:
-        return ideas.record_ideas_batch(conn, project, items)
+        return ideas.record_ideas_batch(
+            conn, project, [item.model_dump() for item in items]
+        )
 
 
-@server.tool(
+@tool(
     description="List ideas filtered by project, status (default open), category and priority."
 )
 def list_ideas(
     project: str | None = None,
-    status: str = "open",
-    category: str | None = None,
-    priority: str | None = None,
+    status: StatusFilter = "open",
+    category: Category | None = None,
+    priority: Priority | None = None,
     compact: bool = False,
 ) -> dict[str, Any]:
     """List ideas. status: open|in_progress|completed|archived|all."""
@@ -76,7 +89,7 @@ def list_ideas(
         )
 
 
-@server.tool(
+@tool(
     description="Search ideas by title, description, tags or prompt (case-insensitive substring match)."
 )
 def search_ideas(query: str, project: str | None = None) -> dict[str, Any]:
@@ -85,15 +98,15 @@ def search_ideas(query: str, project: str | None = None) -> dict[str, Any]:
         return ideas.search_ideas(conn, query, project)
 
 
-@server.tool(
+@tool(
     description="Update an existing idea's title, description, category, priority, tags, or prompt."
 )
 def update_idea(
     idea_id: int,
     title: str | None = None,
     description: str | None = None,
-    category: str | None = None,
-    priority: str | None = None,
+    category: Category | None = None,
+    priority: Priority | None = None,
     tags: list[str] | None = None,
     prompt: str | None = None,
 ) -> dict[str, Any]:
@@ -104,23 +117,23 @@ def update_idea(
         )
 
 
-@server.tool(
+@tool(
     description="Transition an idea to open, in_progress, completed or archived."
 )
-def update_idea_status(idea_id: int, status: str) -> dict[str, Any]:
+def update_idea_status(idea_id: int, status: Status) -> dict[str, Any]:
     """Update an idea's status by id."""
     with get_database() as conn:
         return ideas.update_idea_status(conn, idea_id, status)
 
 
-@server.tool(description="Permanently delete an idea from the vault by its ID.")
+@tool(description="Permanently delete an idea from the vault by its ID.")
 def delete_idea(idea_id: int) -> dict[str, Any]:
     """Permanently delete an idea from the vault by its ID."""
     with get_database() as conn:
         return ideas.delete_idea(conn, idea_id)
 
 
-@server.tool(
+@tool(
     description="Export one project's open and in-progress ideas as grouped GitHub-style markdown."
 )
 def export_ideas_markdown(project: str) -> dict[str, Any]:
@@ -129,7 +142,7 @@ def export_ideas_markdown(project: str) -> dict[str, Any]:
         return ideas.export_ideas_markdown(conn, project)
 
 
-@server.tool(
+@tool(
     description="Post an asynchronous note to the shared blackboard for other agents."
 )
 def post_board_note(
@@ -144,7 +157,7 @@ def post_board_note(
         return blackboard.post_board_note(conn, project, topic, note, sender, target)
 
 
-@server.tool(
+@tool(
     description="Read blackboard notes for a project, unread only by default, optionally marking them read."
 )
 def read_board_notes(
@@ -161,7 +174,7 @@ def read_board_notes(
         )
 
 
-@server.tool(
+@tool(
     description="Delete handled blackboard notes: read notes only by default, or every note with include_unread."
 )
 def clear_board_notes(

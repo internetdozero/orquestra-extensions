@@ -12,6 +12,7 @@ from .store import (
     CATEGORIES,
     PRIORITIES,
     STATUSES,
+    MissingIdea,
     clamp_limit,
     optional_choice,
     require_choice,
@@ -204,7 +205,7 @@ def update_idea_status(
             (new_status, int(idea_id)),
         )
     if cursor.rowcount == 0:
-        raise LookupError(f"idea #{idea_id} not found")
+        raise MissingIdea(f"idea #{idea_id} not found")
     row = conn.execute("SELECT * FROM ideas WHERE id = ?", (int(idea_id),)).fetchone()
     data = idea_dict(row)
     data["message"] = f"Idea #{data['id']} is now {new_status}."
@@ -249,7 +250,7 @@ def update_idea(
         params,
     )
     if cursor.rowcount == 0:
-        raise LookupError(f"idea #{idea_id} not found")
+        raise MissingIdea(f"idea #{idea_id} not found")
     row = conn.execute("SELECT * FROM ideas WHERE id = ?", (int(idea_id),)).fetchone()
     data = idea_dict(row)
     data["message"] = f"Idea #{data['id']} updated successfully."
@@ -261,7 +262,7 @@ def delete_idea(conn: sqlite3.Connection, idea_id: int) -> dict[str, Any]:
     idea_id = int(idea_id)
     row = conn.execute("SELECT * FROM ideas WHERE id = ?", (idea_id,)).fetchone()
     if row is None:
-        raise LookupError(f"idea #{idea_id} not found")
+        raise MissingIdea(f"idea #{idea_id} not found")
     conn.execute("DELETE FROM ideas WHERE id = ?", (idea_id,))
     return {"id": idea_id, "deleted": True, "message": f"Idea #{idea_id} deleted."}
 

@@ -17,10 +17,13 @@ Group by capability. The entry point only wires modules. A shared module exists 
 - `idea_vault/ideas.py` — idea CRUD, filtered listing, search, markdown export.
 - `idea_vault/blackboard.py` — async collaboration notes between agents.
 - `idea_vault/serializers.py` — rows to dicts, tag parsing/serialization.
+- `idea_vault/schema.py` — closed vocabularies (`Category`, `Priority`, `Status`) and the batch item model published as tool-schema enums.
+- `idea_vault/errors.py` — `actionable`: anticipated failures become `ToolError`, bugs stay crashes.
 - `idea_vault/server.py` — MCP entrypoint: registers tools, parses args, runs stdio transport.
 - `tests/conftest.py` — shared throwaway-vault fixtures.
 - `tests/test_vault.py` — schema, idea CRUD, search and export tests.
 - `tests/test_blackboard.py` — blackboard messaging, MCP registration and path wiring tests.
+- `tests/test_schema.py` — published enums and actionable tool errors.
 
 ## Commands
 
