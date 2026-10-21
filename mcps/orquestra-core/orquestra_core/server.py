@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from mcp.server.mcpserver import MCPServer
 
-from . import catalog, catalog_admin, fleet, instructions, paths, presets, skill_admin, skills
+from . import catalog, catalog_admin, fleet, instructions, paths, presets, skill_admin, skills, vault
 
 INSTRUCTIONS = """Control plane for the OrquestraAI harness fleet on this machine.
 
@@ -211,6 +211,41 @@ def orquestra_create_mcp(
 def orquestra_delete_mcp(mcp_id: str) -> dict[str, Any]:
     """Backs up the catalog, drops the entry and its managed id, then redeploys."""
     return _guarded(catalog_admin.delete_mcp, mcp_id)
+
+
+@server.tool(
+    description="List all credential services in Orquestra Vault with health and masked keys. Zero secrets returned."
+)
+def orquestra_vault_list() -> list[dict[str, Any]]:
+    """Inspect configured API services and key pools without exposing any secret."""
+    return vault.list_services()
+
+
+@server.tool(
+    description="Execute blind HTTP request using a stored service credential. The secret is injected in memory and scrubbed from responses."
+)
+def orquestra_vault_http(
+    service_id: str,
+    endpoint: str,
+    method: str = "GET",
+    headers: dict[str, str] | None = None,
+    body: Any | None = None,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
+    """service_id: e.g. 'inception-labs', 'openai', 'github'. Returns status, scrubbed headers, and scrubbed body."""
+    return _guarded(vault.execute_http, service_id, endpoint, method, headers, body, timeout)
+
+
+@server.tool(
+    description="Execute CLI command with stored service credentials injected into environment in memory. Output is scrubbed."
+)
+def orquestra_vault_exec(
+    service_id: str,
+    command: list[str] | str,
+    timeout: float = 60.0,
+) -> dict[str, Any]:
+    """service_id: e.g. 'github', 'cloudflare', 'inception-labs'. Command runs with secret in env, output scrubbed."""
+    return _guarded(vault.execute_exec, service_id, command, timeout)
 
 
 def main(argv: list[str] | None = None) -> int:
