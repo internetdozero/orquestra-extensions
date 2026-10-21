@@ -16,8 +16,11 @@ Group by capability. The entry point only wires modules. A shared module exists 
 - `session_relay/models.py` — session, event and search-hit dataclasses.
 - `session_relay/paths.py` — home resolution, env override, timestamp and text helpers.
 - `session_relay/discovery.py` — adapter registry and cross-harness recent-session merge.
+- `session_relay/lookup.py` — session-id inference, cross-store fallback and resolution.
 - `session_relay/handoff.py` — the baton-pass brief synthesizer.
-- `session_relay/server.py` — MCP entrypoint and the four tool registrations.
+- `session_relay/schema.py` — canonical harness ids and accepted aliases published as enums.
+- `session_relay/errors.py` — actionable errors for expected invalid input and store failures.
+- `session_relay/server.py` — MCP entrypoint and tool registrations.
 - `session_relay/adapters/base.py` — adapter interface and JSONL/turn helpers.
 - `session_relay/adapters/{codex,claude,antigravity,opencode,freebuff,grok}.py` — one read-only adapter per harness storage format.
 - `session_relay/adapters/grok_store.py` — Grok folder/subagent discovery and summary metadata.
@@ -27,6 +30,7 @@ Group by capability. The entry point only wires modules. A shared module exists 
 - `session_relay/adapters/freebuff_store.py` — bounded readers for very large Freebuff chat JSON.
 - `session_relay/adapters/freebuff_desktop.py` — read-only Freebuff Desktop v2 SQLite (`desktop:<slug>:<thread-id>` ids, `parts_json` mapping).
 - `tests/` — per-adapter fixtures, handoff and MCP wiring tests.
+- `tests/test_schema.py` — published harness enums and actionable MCP error behavior.
 
 ## Commands
 

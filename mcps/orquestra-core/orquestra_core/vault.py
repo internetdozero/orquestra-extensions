@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from . import paths
+from .errors import UnknownVaultService, VaultRequestError
 
 SENSITIVE_HEADERS = {
     "authorization",
@@ -146,7 +147,7 @@ def get_service(vault_data: dict[str, Any], service_id: str) -> dict[str, Any]:
     services = vault_data.get("services", {})
     if service_id not in services:
         available = ", ".join(services.keys()) or "none"
-        raise LookupError(f"unknown vault service '{service_id}'; available: {available}")
+        raise UnknownVaultService(f"unknown vault service '{service_id}'; available: {available}")
     return services[service_id]
 
 
@@ -288,9 +289,9 @@ def execute_http(
             last_err = e
             if attempt < attempts - 1:
                 continue
-            raise RuntimeError(f"vault HTTP request failed: {e}") from e
+            raise VaultRequestError(f"vault HTTP request failed: {e}") from e
 
-    raise RuntimeError(f"all keys failed for service '{service_id}': {last_err}")
+    raise VaultRequestError(f"all keys failed for service '{service_id}': {last_err}")
 
 
 def execute_exec(service_id: str, command: str | list[str], timeout: float = 60.0) -> dict[str, Any]:

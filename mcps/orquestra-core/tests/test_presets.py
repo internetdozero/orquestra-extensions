@@ -254,6 +254,8 @@ def test_delete_preset_not_found(mock_home: Path) -> None:
 def test_save_delete_tools_roundtrip(mock_home: Path) -> None:
     import asyncio
 
+    from mcp.server.mcpserver.exceptions import ToolError
+
     from orquestra_core.server import server
 
     saved = asyncio.run(
@@ -264,7 +266,8 @@ def test_save_delete_tools_roundtrip(mock_home: Path) -> None:
         server.call_tool("orquestra_delete_preset", {"preset_id": "tool-preset"})
     )
     assert removed.structured_content["deleted"] is True
-    builtin = asyncio.run(
-        server.call_tool("orquestra_delete_preset", {"preset_id": "stealth"})
-    )
-    assert "Cannot delete built-in" in builtin.structured_content["error"]
+    with pytest.raises(ToolError) as refused:
+        asyncio.run(
+            server.call_tool("orquestra_delete_preset", {"preset_id": "stealth"})
+        )
+    assert "Cannot delete built-in" in str(refused.value)

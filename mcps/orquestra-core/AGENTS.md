@@ -18,6 +18,8 @@ The entry point only wires modules. A module is split once it owns two capabilit
 - `orquestra_core/skill_admin.py` — skill creation in the vault and archive-on-delete.
 - `orquestra_core/fsutil.py` — atomic text writes, timestamped backups, collision-free names.
 - `orquestra_core/bridge.py` — subprocess wrapper around the native `orquestra` binary and its JSON reports.
+- `orquestra_core/errors.py` — actionable MCP errors for expected control-plane failures; unexpected bugs stay crashes.
+- `orquestra_core/schema.py` — closed MCP argument vocabularies such as HTTP methods.
 - `orquestra_core/fleet.py` — condenses `--bridge-status` output for the fleet tool; delegates `--bridge-deploy`.
 - `orquestra_core/catalog.py` — reads `mcps.json`, saves it atomically, toggles through `--mcp-set` plus `--mcp-deploy`.
 - `orquestra_core/catalog_admin.py` — registers and retires MCP servers, then redeploys.
@@ -28,6 +30,7 @@ The entry point only wires modules. A module is split once it owns two capabilit
 - `tests/test_core.py` — skills, catalog, instructions and bridge behavior.
 - `tests/test_lifecycle.py` — skill and MCP creation, archival and removal.
 - `tests/test_presets.py` — preset listing, apply (happy path + validation), unknown-id errors, bridge deploy.
+- `tests/test_schema.py` — published enum and actionable error contracts.
 
 ## Commands
 

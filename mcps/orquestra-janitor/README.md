@@ -6,7 +6,10 @@ agentic workspaces, exposed as a local MCP server (stdio, no network).
 Reports RAM/swap/`/tmp` tmpfs pressure, detects orphaned development workers
 (headless browsers, dead agent runners, detached compilers), sweeps them behind
 an immutable protected denylist (SIGTERM → 3s → SIGKILL, `dry_run` by default)
-and removes age-gated stale sockets and scratch caches.
+and removes age-gated stale sockets and scratch caches. The schema publishes
+`target_type` (`orphans`, `browsers`, `compilers`) and cache `targets`
+(`sockets`, `staging`, `testing_scratch`) as enums; validation and operational
+failures arrive as MCP tool errors (`isError: true`) with their reason.
 
 ## Run
 

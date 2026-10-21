@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import Field
 
 from . import exa_search
 
@@ -25,9 +27,12 @@ so widen num_results rather than asking for a next page.
 The tool reads EXA_API_KEY from the server's environment, then from a local
 .env next to the installed package or above the working directory
 (WEB_SEARCH_ENV_FILE overrides that lookup). A missing key, a rejected key
-(401), exhausted credits (402) and rate limiting (429) come back as an
-{"error": ...} object with the HTTP status in error_status, never as an empty
-result list.
+(401), exhausted credits (402) and rate limiting (429) come back as a tool
+error carrying the status and what to do about it, never as an empty result
+list.
+
+num_results is bounded (1-100) and start_published_date must be an ISO
+YYYY-MM-DD date; both are enforced by the tool schema before Exa is called.
 """
 
 server = MCPServer(
@@ -37,22 +42,46 @@ server = MCPServer(
     instructions=INSTRUCTIONS,
 )
 
-FALLBACK_ERROR_STATUS = "See the message for details."
+Query = Annotated[
+    str,
+    Field(min_length=1, description="What to search for, in natural language."),
+]
+ResultCount = Annotated[
+    int,
+    Field(
+        ge=1,
+        le=exa_search.MAX_NUM_RESULTS,
+        description=(
+            f"Results to return, 1-{exa_search.MAX_NUM_RESULTS} "
+            f"(default {exa_search.DEFAULT_NUM_RESULTS})."
+        ),
+    ),
+]
+PublishedDate = Annotated[
+    str | None,
+    Field(
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description=(
+            "ISO date floor (YYYY-MM-DD): only pages published on or after it. "
+            "Leave unset for an ordinary search."
+        ),
+    ),
+]
 
 
 @server.tool(
     description=(
         "Search the web with Exa. Returns title, url, published_date, author and "
         "highlights per result. num_results is 1-100 (default 5); include_domains "
-        "and start_published_date are optional hard constraints. Failures return "
-        "an error object instead of an empty list."
+        "and start_published_date are optional hard constraints. A failed search "
+        "is a tool error with the reason, never an empty result list."
     )
 )
 def web_search(
-    query: str,
-    num_results: int = exa_search.DEFAULT_NUM_RESULTS,
+    query: Query,
+    num_results: ResultCount = exa_search.DEFAULT_NUM_RESULTS,
     include_domains: list[str] | None = None,
-    start_published_date: str | None = None,
+    start_published_date: PublishedDate = None,
 ) -> dict[str, Any]:
     """Query in, cited results out."""
     try:
@@ -63,10 +92,9 @@ def web_search(
             start_published_date=start_published_date,
         )
     except exa_search.SearchError as error:
-        return {
-            "error": str(error),
-            "error_status": error.status or FALLBACK_ERROR_STATUS,
-        }
+        # The message already names the cause and the fix (missing key, 401,
+        # 402, 429); is_error=true is what makes the caller act on it.
+        raise ToolError(str(error)) from error
 
 
 def main(argv: list[str] | None = None) -> int:

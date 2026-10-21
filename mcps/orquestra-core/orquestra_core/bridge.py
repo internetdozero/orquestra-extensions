@@ -7,6 +7,7 @@ import subprocess
 from typing import Any
 
 from . import paths
+from .errors import BridgeError
 
 TIMEOUT = 180
 
@@ -23,9 +24,9 @@ def run(*args: str, timeout: int = TIMEOUT) -> subprocess.CompletedProcess[str]:
             check=False,
         )
     except FileNotFoundError as error:
-        raise RuntimeError(f"the native '{command[0]}' binary is not installed") from error
+        raise BridgeError(f"the native '{command[0]}' binary is not installed") from error
     except subprocess.TimeoutExpired as error:
-        raise RuntimeError(f"'{' '.join(command)}' timed out after {timeout}s") from error
+        raise BridgeError(f"'{' '.join(command)}' timed out after {timeout}s") from error
 
 
 def _json(proc: subprocess.CompletedProcess[str], label: str) -> Any:
@@ -33,11 +34,11 @@ def _json(proc: subprocess.CompletedProcess[str], label: str) -> Any:
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip().splitlines()
         tail = detail[-1] if detail else "no output"
-        raise RuntimeError(f"{label} failed (exit {proc.returncode}): {tail}")
+        raise BridgeError(f"{label} failed (exit {proc.returncode}): {tail}")
     try:
         return json.loads(proc.stdout)
     except json.JSONDecodeError as error:
-        raise RuntimeError(f"{label} returned malformed JSON: {error}") from error
+        raise BridgeError(f"{label} returned malformed JSON: {error}") from error
 
 
 def mcp_set(mcp_id: str, scope: str, enabled: bool) -> dict[str, Any]:
@@ -55,7 +56,7 @@ def bridge_status() -> list[dict[str, Any]]:
     """Harness link state for every known harness."""
     report = _json(run("--bridge-status"), "--bridge-status")
     if not isinstance(report, list):
-        raise RuntimeError("--bridge-status did not return a list of harnesses")
+        raise BridgeError("--bridge-status did not return a list of harnesses")
     return report
 
 

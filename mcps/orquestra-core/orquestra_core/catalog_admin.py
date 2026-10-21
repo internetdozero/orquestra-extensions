@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from . import bridge, catalog, paths
+from .errors import BridgeError
 
 _MCP_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
@@ -28,8 +29,8 @@ def _deploy(saved_note: str) -> dict[str, Any]:
     """Compile the catalog outward, keeping the saved-state hint on failure."""
     try:
         return bridge.mcp_deploy()
-    except RuntimeError as error:
-        raise RuntimeError(f"{error} ({saved_note}; rerun orquestra --mcp-deploy)") from error
+    except BridgeError as error:
+        raise BridgeError(f"{error} ({saved_note}; rerun orquestra --mcp-deploy)") from error
 
 
 def create_mcp(

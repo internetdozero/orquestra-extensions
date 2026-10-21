@@ -98,6 +98,12 @@ def _payload(result: dict[str, Any]) -> Any:
     return structured
 
 
+def _error_text(result: dict[str, Any]) -> str:
+    """Assert the call failed and return the message the model would read."""
+    assert result.get("isError") is True, result
+    return "".join(block.get("text", "") for block in result.get("content") or [])
+
+
 def test_tools_list_exposes_all_five(client: Client) -> None:
     result = client.request("tools/list")
     names = sorted(tool["name"] for tool in result["tools"])
@@ -146,8 +152,8 @@ def test_clean_caches_dry_run(client: Client) -> None:
 
 
 def test_clean_caches_validation_error_is_reported(client: Client) -> None:
-    result = _payload(client.call("janitor_clean_caches", {"older_than_hours": -1}))
-    assert "older_than_hours" in result["error"]
+    result = client.call("janitor_clean_caches", {"older_than_hours": -1})
+    assert "older_than_hours" in _error_text(result)
 
 
 def test_oom_inspect_tool(client: Client) -> None:
@@ -157,6 +163,6 @@ def test_oom_inspect_tool(client: Client) -> None:
     assert scores == sorted(scores, reverse=True)
 
 
-def test_sweep_bad_arguments_return_error_object(client: Client) -> None:
-    result = _payload(client.call("janitor_sweep_processes", {}))
-    assert "provide pids" in result["error"]
+def test_sweep_bad_arguments_report_a_tool_error(client: Client) -> None:
+    result = client.call("janitor_sweep_processes", {})
+    assert "provide pids" in _error_text(result)

@@ -9,6 +9,8 @@ from typing import Any, Callable
 from mcp.server.mcpserver import MCPServer
 
 from . import catalog, catalog_admin, fleet, instructions, paths, presets, skill_admin, skills, vault
+from .errors import actionable
+from .schema import HttpMethod
 
 INSTRUCTIONS = """Control plane for the OrquestraAI harness fleet on this machine.
 
@@ -45,15 +47,12 @@ server = MCPServer(
 )
 
 
-def _guarded(action: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -> dict[str, Any]:
-    """Run a dict-returning action, turning known failures into readable errors."""
-    try:
-        return action(*args, **kwargs)
-    except (ValueError, LookupError, RuntimeError) as error:
-        return {"error": str(error)}
+def tool(*, description: str) -> Callable[[Callable[..., Any]], Any]:
+    """Register a tool whose anticipated failures reach the caller verbatim."""
+    return lambda fn: server.tool(description=description)(actionable(fn))
 
 
-@server.tool(
+@tool(
     description="List every skill in the vault with token weight and whether a scope projects it."
 )
 def orquestra_list_skills(scope: str = "global") -> list[dict[str, Any]]:
@@ -61,59 +60,59 @@ def orquestra_list_skills(scope: str = "global") -> list[dict[str, Any]]:
     return skills.list_skills(scope)
 
 
-@server.tool(
+@tool(
     description="Activate a skill in a scope; 'global' propagates the symlink to every harness."
 )
 def orquestra_enable_skill(skill_id: str, scope: str = "global") -> dict[str, Any]:
     """Create the active/<scope>/<skill> symlink atomically and report the scopes changed."""
-    return _guarded(skills.enable_skill, skill_id, scope)
+    return skills.enable_skill(skill_id, scope)
 
 
-@server.tool(
+@tool(
     description="Deactivate a skill; 'global' removes its symlink from every harness projection."
 )
 def orquestra_disable_skill(skill_id: str, scope: str = "global") -> dict[str, Any]:
     """Remove the projection and report the approximate tokens freed."""
-    return _guarded(skills.disable_skill, skill_id, scope)
+    return skills.disable_skill(skill_id, scope)
 
 
-@server.tool(description="List registered MCP servers with their global and per-harness state.")
+@tool(description="List registered MCP servers with their global and per-harness state.")
 def orquestra_list_mcps() -> list[dict[str, Any]]:
     """Reads ~/.orquestra/mcps.json, the catalog OrquestraAI compiles outward."""
     return catalog.list_mcps()
 
 
-@server.tool(
+@tool(
     description="Enable or disable one MCP server, then redeploy the catalog to every harness."
 )
 def orquestra_toggle_mcp(
     mcp_id: str, scope: str = "global", enabled: bool = True
 ) -> dict[str, Any]:
     """scope: 'global' or a harness id. Returns the config files that changed."""
-    return _guarded(catalog.toggle_mcp, mcp_id, scope, enabled)
+    return catalog.toggle_mcp(mcp_id, scope, enabled)
 
 
-@server.tool(description="Return the master ~/.orquestra/AGENTS.md that every harness inherits.")
+@tool(description="Return the master ~/.orquestra/AGENTS.md that every harness inherits.")
 def orquestra_read_instructions() -> str:
     """The single source of truth symlinked into each harness."""
     return instructions.read_instructions()
 
 
-@server.tool(
+@tool(
     description="Append a mission directive to a section of the master AGENTS.md, with a backup."
 )
 def orquestra_append_mission_rule(section_title: str, rule_content: str) -> dict[str, Any]:
     """Creates the section when missing; never rewrites unrelated sections."""
-    return _guarded(instructions.append_mission_rule, section_title, rule_content)
+    return instructions.append_mission_rule(section_title, rule_content)
 
 
-@server.tool(description="Report link state for every harness in the OrquestraAI fleet.")
+@tool(description="Report link state for every harness in the OrquestraAI fleet.")
 def orquestra_fleet_status() -> dict[str, Any]:
     """Runs orquestra --bridge-status and condenses the per-harness report."""
-    return _guarded(fleet.fleet_status)
+    return fleet.fleet_status()
 
 
-@server.tool(
+@tool(
     description=(
         "List all built-in and custom mission presets with their active status "
         "and member skills/MCPs."
@@ -125,7 +124,7 @@ def orquestra_list_presets() -> list[dict[str, Any]]:
     return presets.list_presets()
 
 
-@server.tool(
+@tool(
     description=(
         "Apply a curated mission preset (e.g. stealth, rust-dev, web-fullstack, full-power) "
         "across all harnesses."
@@ -133,10 +132,10 @@ def orquestra_list_presets() -> list[dict[str, Any]]:
 )
 def orquestra_apply_preset(preset_id: str) -> dict[str, Any]:
     """Validates the id, then delegates to orquestra --preset <id> and returns a PresetReport."""
-    return _guarded(presets.apply_preset, preset_id)
+    return presets.apply_preset(preset_id)
 
 
-@server.tool(description="Save a new custom mission preset with a selection of skills and MCP servers.")
+@tool(description="Save a new custom mission preset with a selection of skills and MCP servers.")
 def orquestra_save_preset(
     name: str,
     description: str = "",
@@ -145,16 +144,16 @@ def orquestra_save_preset(
     icon: str = "custom",
 ) -> dict[str, Any]:
     """Creates or updates a custom preset in ~/.orquestra/presets.json."""
-    return _guarded(presets.save_preset, name, description, skills, mcps, icon)
+    return presets.save_preset(name, description, skills, mcps, icon)
 
 
-@server.tool(description="Delete a custom mission preset by its ID. Built-in presets cannot be deleted.")
+@tool(description="Delete a custom mission preset by its ID. Built-in presets cannot be deleted.")
 def orquestra_delete_preset(preset_id: str) -> dict[str, Any]:
     """Removes a custom preset from ~/.orquestra/presets.json."""
-    return _guarded(presets.delete_preset, preset_id)
+    return presets.delete_preset(preset_id)
 
 
-@server.tool(
+@tool(
     description=(
         "Deploy harness bridge fusion: back up and symlink every installed harness "
         "into the fleet projection."
@@ -162,10 +161,10 @@ def orquestra_delete_preset(preset_id: str) -> dict[str, Any]:
 )
 def orquestra_deploy_bridge() -> dict[str, Any]:
     """Delegates to orquestra --bridge-deploy and returns a BridgeReport."""
-    return _guarded(fleet.deploy_bridge)
+    return fleet.deploy_bridge()
 
 
-@server.tool(
+@tool(
     description="Create a skill in the vault with frontmatter, markdown body and optional scripts."
 )
 def orquestra_create_skill(
@@ -176,20 +175,20 @@ def orquestra_create_skill(
     scripts: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Writes skills-library/<id>/SKILL.md; scripts land in that skill's scripts/ folder."""
-    return _guarded(
-        skill_admin.create_skill, skill_id, name, description, instructions_markdown, scripts
+    return skill_admin.create_skill(
+        skill_id, name, description, instructions_markdown, scripts
     )
 
 
-@server.tool(
+@tool(
     description="Archive a skill: unlink it from every scope, then move its vault folder to backups."
 )
 def orquestra_delete_skill(skill_id: str) -> dict[str, Any]:
     """Never hard-deletes: the vault folder is moved under backups/deleted-skills-<stamp>/."""
-    return _guarded(skill_admin.delete_skill, skill_id)
+    return skill_admin.delete_skill(skill_id)
 
 
-@server.tool(
+@tool(
     description="Register a new MCP server in the catalog, then deploy it to every harness."
 )
 def orquestra_create_mcp(
@@ -202,18 +201,18 @@ def orquestra_create_mcp(
     global_enabled: bool = True,
 ) -> dict[str, Any]:
     """Adds the entry to mcps.json and managedIds, then runs --mcp-deploy."""
-    return _guarded(
-        catalog_admin.create_mcp, mcp_id, name, description, command, args, env, global_enabled
+    return catalog_admin.create_mcp(
+        mcp_id, name, description, command, args, env, global_enabled
     )
 
 
-@server.tool(description="Remove an MCP server from the catalog and from every harness config.")
+@tool(description="Remove an MCP server from the catalog and from every harness config.")
 def orquestra_delete_mcp(mcp_id: str) -> dict[str, Any]:
     """Backs up the catalog, drops the entry and its managed id, then redeploys."""
-    return _guarded(catalog_admin.delete_mcp, mcp_id)
+    return catalog_admin.delete_mcp(mcp_id)
 
 
-@server.tool(
+@tool(
     description="List all credential services in Orquestra Vault with health and masked keys. Zero secrets returned."
 )
 def orquestra_vault_list() -> list[dict[str, Any]]:
@@ -221,22 +220,22 @@ def orquestra_vault_list() -> list[dict[str, Any]]:
     return vault.list_services()
 
 
-@server.tool(
+@tool(
     description="Execute blind HTTP request using a stored service credential. The secret is injected in memory and scrubbed from responses."
 )
 def orquestra_vault_http(
     service_id: str,
     endpoint: str,
-    method: str = "GET",
+    method: HttpMethod = "GET",
     headers: dict[str, str] | None = None,
     body: Any | None = None,
     timeout: float = 30.0,
 ) -> dict[str, Any]:
     """service_id: e.g. 'inception-labs', 'openai', 'github'. Returns status, scrubbed headers, and scrubbed body."""
-    return _guarded(vault.execute_http, service_id, endpoint, method, headers, body, timeout)
+    return vault.execute_http(service_id, endpoint, method, headers, body, timeout)
 
 
-@server.tool(
+@tool(
     description="Execute CLI command with stored service credentials injected into environment in memory. Output is scrubbed."
 )
 def orquestra_vault_exec(
@@ -245,7 +244,7 @@ def orquestra_vault_exec(
     timeout: float = 60.0,
 ) -> dict[str, Any]:
     """service_id: e.g. 'github', 'cloudflare', 'inception-labs'. Command runs with secret in env, output scrubbed."""
-    return _guarded(vault.execute_exec, service_id, command, timeout)
+    return vault.execute_exec(service_id, command, timeout)
 
 
 def main(argv: list[str] | None = None) -> int:

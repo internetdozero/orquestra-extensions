@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any, Callable
+from typing import Annotated, Any, Callable
 
 from mcp.server.mcpserver import MCPServer
+from pydantic import Field
 
 from . import caches, health, oom, orphans, sweep
+from .errors import actionable
+from .schema import CacheTarget, SweepTarget
 
 INSTRUCTIONS = """Linux housekeeping for agentic workspaces, local-only and read-mostly.
 
@@ -40,15 +43,18 @@ server = MCPServer(
 )
 
 
-def _guarded(action: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
-    """Run an action, turning readable failures into a structured error."""
-    try:
-        return action(*args, **kwargs)
-    except (ValueError, OSError) as error:
-        return {"error": str(error)}
+def tool(*, description: str) -> Callable[[Callable[..., Any]], Any]:
+    """Register a tool whose anticipated failures reach the caller verbatim."""
+    return lambda fn: server.tool(description=description)(actionable(fn))
 
 
-@server.tool(
+AgeHours = Annotated[
+    int,
+    Field(ge=0, description="Only remove entries older than this many hours."),
+]
+
+
+@tool(
     description=(
         "RAM/swap/tmpfs health: used/free RAM and swap, /tmp tmpfs utilization, "
         "CPU load, cpu.temperature_c from the hottest thermal zone, and the "
@@ -58,10 +64,10 @@ def _guarded(action: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
 )
 def janitor_system_health() -> dict[str, Any]:
     """Snapshot of memory, tmpfs, CPU and the heaviest processes."""
-    return _guarded(health.system_health)
+    return health.system_health()
 
 
-@server.tool(
+@tool(
     description=(
         "Scan this user's processes for suspected orphaned development workers "
         "(PPID=1, dead parent, zombie): headless browsers, agent runners, "
@@ -70,13 +76,10 @@ def janitor_system_health() -> dict[str, Any]:
 )
 def janitor_scan_orphans() -> list[dict[str, Any]]:
     """Read-only list: pid, name, memory_mb, cpu_percent, command, ppid, reason."""
-    try:
-        return orphans.scan_orphans()
-    except OSError as error:
-        return [{"error": str(error)}]
+    return orphans.scan_orphans()
 
 
-@server.tool(
+@tool(
     description=(
         "Terminate processes safely. Provide explicit pids and/or "
         "target_type='orphans'|'browsers'|'compilers'. dry_run=true (default) "
@@ -86,15 +89,15 @@ def janitor_scan_orphans() -> list[dict[str, Any]]:
 )
 def janitor_sweep_processes(
     pids: list[int] | None = None,
-    target_type: str | None = None,
+    target_type: SweepTarget | None = None,
     dry_run: bool = True,
     force: bool = False,
 ) -> dict[str, Any]:
     """Denylist-checked termination plan or execution."""
-    return _guarded(sweep.sweep, pids, target_type, dry_run, force)
+    return sweep.sweep(pids, target_type, dry_run, force)
 
 
-@server.tool(
+@tool(
     description=(
         "Clean transient caches. targets: sockets (dead ~/.orquestra/*.sock), "
         "staging (.codex marketplace staging), testing_scratch "
@@ -104,14 +107,14 @@ def janitor_sweep_processes(
 )
 def janitor_clean_caches(
     dry_run: bool = True,
-    targets: list[str] | None = None,
-    older_than_hours: int = caches.DEFAULT_OLDER_THAN_HOURS,
+    targets: list[CacheTarget] | None = None,
+    older_than_hours: AgeHours = caches.DEFAULT_OLDER_THAN_HOURS,
 ) -> dict[str, Any]:
     """Age-gated removal report with per-item actions and reclaimable MB."""
-    return _guarded(caches.clean_caches, dry_run, targets, older_than_hours)
+    return caches.clean_caches(dry_run, targets, older_than_hours)
 
 
-@server.tool(
+@tool(
     description=(
         "Inspect oom_score and oom_score_adj for active agent runners to show "
         "kernel sacrifice priority under memory pressure, with recommendations."
@@ -119,7 +122,7 @@ def janitor_clean_caches(
 )
 def janitor_oom_inspect() -> dict[str, Any]:
     """Sorted OOM priority of this user's runners plus advisory notes."""
-    return _guarded(oom.oom_inspect)
+    return oom.oom_inspect()
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -5,6 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 
+import pytest
+from mcp.server.mcpserver.exceptions import ToolError
+
 from builders import make_codex
 from session_relay import policy
 from session_relay.policy import policy_path
@@ -100,6 +103,6 @@ def test_pin_tools_and_decorated_listing(relay_home):
 
 
 def test_pin_tools_reject_empty_ids(relay_home):
-    bad = _call("pin_session", {"harness": "codex", "session_id": "  "})
-    assert bad.structured_content["pinned"] is False
-    assert "error" in bad.structured_content
+    with pytest.raises(ToolError) as caught:
+        _call("pin_session", {"harness": "codex", "session_id": "  "})
+    assert "harness and session_id must be non-empty strings" in str(caught.value)

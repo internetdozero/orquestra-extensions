@@ -19,7 +19,10 @@ The entry point only wires modules. A module is split once it owns two capabilit
 - `janitor/caches.py` — age-gated removal of dead `~/.orquestra/*.sock`, `.codex` staging dirs, `/var/tmp/testing/` scratch.
 - `janitor/oom.py` — reads `/proc/<pid>/oom_score{,_adj}` for agent runners and recommends sacrifice priority.
 - `janitor/server.py` — MCP tool registration and entry point.
+- `janitor/schema.py` — closed target vocabularies published as tool enums.
+- `janitor/errors.py` — actionable errors for expected input and system-state failures.
 - `tests/` — unit tests; every temporary fixture lives under `/var/tmp/testing/`, never `/tmp`.
+- `tests/test_schema.py` — published enums and MCP error behavior.
 
 ## Commands
 

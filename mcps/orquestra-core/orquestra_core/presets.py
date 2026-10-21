@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from . import bridge, catalog, fsutil, paths, skills
+from .errors import MissingPreset
 
 # Maximum length accepted for a preset ID (guards against absurdly long inputs).
 _MAX_ID_LEN = 64
@@ -214,7 +215,7 @@ def delete_preset(preset_id: str) -> dict[str, Any]:
     custom = _custom_entries(data)
     kept = [entry for entry in custom if str(entry.get("id")) != preset_id]
     if len(kept) == len(custom):
-        raise LookupError(f"Preset '{preset_id}' not found")
+        raise MissingPreset(f"Preset '{preset_id}' not found")
     active = data.get("active")
     if active == preset_id:
         active = None

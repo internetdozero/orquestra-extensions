@@ -119,7 +119,11 @@ args = []
 | `search_sessions_history` | `query`, `harness?`, `limit?` (default 10) | `{query, count, hits[], warnings[]}` with snippets |
 
 Harness ids: `codex`, `claude`, `antigravity`, `opencode`, `freebuff`, `grok`
-(aliases: `claude-code`, `gemini`, `manicode`, `open-code`, `xai`).
+(aliases: `claude-code`, `gemini`, `manicode`, `open-code`, `xai`). These
+values are published as JSON-schema enums for every harness parameter. Bad
+harness ids and invalid pin arguments return MCP tool errors (`isError: true`)
+with the accepted values or field-level reason; a valid but missing session
+still returns the friendly not-found payload.
 
 ## Example workflow
 

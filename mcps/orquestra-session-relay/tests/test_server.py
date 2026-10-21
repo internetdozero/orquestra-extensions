@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+from mcp.server.mcpserver.exceptions import ToolError
+
 from builders import make_codex, make_freebuff_desktop
 from session_relay.server import server
 
@@ -139,8 +142,10 @@ def test_empty_and_invalid_states_are_friendly(relay_home):
     assert empty.structured_content["count"] == 0
     assert any("no session store" in warning for warning in empty.structured_content["warnings"])
 
-    unknown = _call("list_recent_sessions", {"harness": "nope"})
-    assert "unknown harness" in unknown.structured_content["error"]
+    with pytest.raises(ToolError) as unknown:
+        _call("list_recent_sessions", {"harness": "nope"})
+    assert "harness" in str(unknown.value)
+    assert "'antigravity'" in str(unknown.value) and "'opencode'" in str(unknown.value)
 
     missing = _call("inspect_session", {"harness": "codex"})
     assert "no OpenAI Codex session store" in missing.structured_content["error"]

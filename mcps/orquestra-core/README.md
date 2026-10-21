@@ -147,6 +147,11 @@ If `orquestra-core` is not on `PATH`, use
 `kilo`, `opencode`). `enabled` on a harness scope means "projected into that
 harness"; `is_inherited` means the global scope also projects it.
 
+`orquestra_vault_http.method` is a JSON-schema enum: `GET`, `POST`, `PUT`,
+`PATCH`, `DELETE`, `HEAD` or `OPTIONS`. Anticipated failures are returned as
+MCP tool errors (`isError: true`) with the actionable reason; unexpected bugs
+remain server-side crashes rather than being mislabeled as input mistakes.
+
 ### Example prompts
 
 ```
