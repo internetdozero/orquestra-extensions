@@ -13,8 +13,16 @@ target/
 # Node
 node_modules/
 dist/
+# Local env files (keep the committed examples)
+.env
+.env.*
+!.env.example
+
+# Agent runtime state, local-only
+.freebuff/
+.orquestra/
+
 # OS / editors
 .DS_Store
 *.swp
 *.swo
-.freebuff/
