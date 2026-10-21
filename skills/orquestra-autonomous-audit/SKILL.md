@@ -23,9 +23,15 @@ When triggered (e.g. `/autonomous-audit [duration] [scopes]`):
 
 ## 2. Invariants & Ground Rules
 
-1. **Anti-Premature-Stop Invariant:**
+1. **Anti-Premature-Stop & Anti-Idling Invariant:**
    - Never stop after fixing a single issue. Once an issue is committed and logged, immediately advance to the next scope or investigation vector.
-   - Work continues until the time window expires OR every declared scope has a recorded, honest Negative Pass.
+   - The shift runs actively for the **entire duration**. Finishing primary sweeps or logging negative passes does NOT terminate the shift.
+   - **STRICTLY FORBIDDEN:** Executing `sleep`, `timeout`, or any idle-waiting command to burn shift time. Every turn MUST produce active repository inspection, test execution, or patch evaluation.
+   - **Continuous Deepening Expansion:** If all declared scopes yield verified negative passes before the shift duration expires, the agent **MUST NOT STOP OR SLEEP**. It must immediately transition to the Deepening Loop:
+     - *Vector A (Test Coverage Gaps):* Audit `tests/` across packages, find uncovered functions or edge cases, and author rigorous unit tests.
+     - *Vector B (Fuzzing & Hostile Inputs):* Stress-test public entry points and MCP handlers with boundary, negative, and malformed inputs.
+     - *Vector C (Typing & Linting Drift):* Run linters or typecheckers to fix unhandled type edge-cases and eliminate dead code.
+     - *Vector D (Idea Vault Backlog):* If `idea-vault` is connected or backlog items exist in the ledger, pick and implement the highest-priority architectural improvement.
 2. **Atomic Micro-Commits (1 Defect = 1 Commit):**
    - Strictly one problem per commit. Never bundle disparate natures into a single commit.
    - Standard Conventional Commits (`fix(scope): ...`, `perf(scope): ...`, `refactor(scope): ...`).
