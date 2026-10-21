@@ -50,8 +50,9 @@ Output a self-contained prompt for the Builder AI containing:
 - **Files & Symbols:** Absolute or relative paths to files to create or modify, highlighting interfaces to preserve.
 - **Behavioral Specs:** Step-by-step functionality, edge cases, error handling.
 - **Idea Vault Task Lifecycle (Mandatory when idea-vault MCP is active):**
-  1. *On Kickoff:* Instruct Builder to immediately transition idea to `in_progress` via `update_idea_status(idea_id=<ID>, status="in_progress")`.
-  2. *On Completion:* Instruct Builder to transition idea to `completed` via `update_idea_status(idea_id=<ID>, status="completed")` as soon as all tests and builds pass.
+  1. *On Planning:* The Orchestrator MUST persist the task via `record_idea(project=..., title=..., description=..., prompt=...)` storing both the short human `description` and the exact technical English Builder `prompt`.
+  2. *On Kickoff:* Instruct Builder to read the attached `prompt` for `idea_id=<ID>` (via `list_ideas`/`search_ideas`) and immediately transition idea to `in_progress` via `update_idea_status(idea_id=<ID>, status="in_progress")`.
+  3. *On Completion:* Instruct Builder to transition idea to `completed` via `update_idea_status(idea_id=<ID>, status="completed")` as soon as all tests and builds pass.
 - **Multi-Harness Context (if applicable):** Include relevant session IDs or handoff notes from `session-relay`.
 - **Engineering Guardrails (Mandatory):**
   - *Anti-Monolith:* Keep files strictly under 300–400 lines; decompose into submodules if growing.

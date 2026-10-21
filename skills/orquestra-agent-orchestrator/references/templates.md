@@ -24,7 +24,8 @@ Copy-pasteable Markdown block to dispatch to the Builder AI:
 
 #### 3. Idea Vault Task Lifecycle (Mandatory when idea-vault MCP is present)
 - **Idea ID:** `<ID>` (e.g., `#253`)
-- **On Kickoff:** Transition status to in-progress: `update_idea_status(idea_id=<ID>, status="in_progress")`.
+- **On Planning (Orchestrator):** Persist the task with both summary and executable prompt: `record_idea(project="<project>", title="<title>", description="<short human summary>", prompt="### Mission: <title>\n\n<full Builder dispatch in English>")`. Use `update_idea(idea_id=<ID>, prompt="<revised prompt>")` if the plan changes.
+- **On Kickoff (Builder):** Read the attached `prompt` (via `list_ideas`/`search_ideas`), then transition status to in-progress: `update_idea_status(idea_id=<ID>, status="in_progress")`.
 - **On Completion:** Transition status to completed: `update_idea_status(idea_id=<ID>, status="completed")` after all verification checks pass.
 
 #### 4. Engineering Guardrails (Strict)
