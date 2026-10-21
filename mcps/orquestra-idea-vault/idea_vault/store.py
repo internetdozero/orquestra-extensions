@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS ideas (
     priority    TEXT NOT NULL DEFAULT 'medium',
     tags        TEXT,
     status      TEXT NOT NULL DEFAULT 'open',
+    prompt      TEXT NOT NULL DEFAULT '',
     created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at  TIMESTAMP
@@ -72,6 +73,16 @@ def migrate_completed_at(conn: sqlite3.Connection) -> bool:
     return True
 
 
+def migrate_prompt(conn: sqlite3.Connection) -> bool:
+    """Add ideas.prompt for orchestrator Builder prompts. Idempotent."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(ideas)").fetchall()}
+    if "prompt" in columns:
+        return False
+    conn.execute("ALTER TABLE ideas ADD COLUMN prompt TEXT NOT NULL DEFAULT ''")
+    conn.commit()
+    return True
+
+
 def connect(db_path: str | Path) -> sqlite3.Connection:
     """Open (creating directories and schema as needed) a connection to the vault."""
     path = Path(db_path).expanduser()
@@ -83,6 +94,7 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout=5000")
     conn.executescript(SCHEMA)
     migrate_completed_at(conn)
+    migrate_prompt(conn)
     return conn
 
 

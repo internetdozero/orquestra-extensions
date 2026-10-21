@@ -19,6 +19,7 @@ IDEA_FIELDS = (
     "created_at",
     "updated_at",
     "completed_at",
+    "prompt",
 )
 
 
@@ -61,6 +62,7 @@ def idea_dict(row: Any) -> dict[str, Any]:
     data = {field: row[field] if field in keys else None for field in IDEA_FIELDS}
     data["completed_at"] = row["completed_at"] if "completed_at" in keys else None
     data["description"] = data["description"] or ""
+    data["prompt"] = row["prompt"] if "prompt" in keys and row["prompt"] else ""
     data["tags"] = load_tags(row["tags"])
     return data
 

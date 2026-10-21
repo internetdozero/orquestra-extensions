@@ -37,11 +37,13 @@ def record_idea(
     category: str = "feature",
     priority: str = "medium",
     tags: list[str] | None = None,
+    prompt: str | None = None,
 ) -> dict[str, Any]:
     """Record an idea. category: feature|architecture|bug|ux|idea, priority: low|medium|high|critical."""
     with get_database() as conn:
         return ideas.record_idea(
-            conn, project, title, description, category, priority, tags
+            conn, project, title, description, category, priority, tags,
+            status="open", prompt=prompt,
         )
 
 
@@ -52,7 +54,7 @@ def record_ideas_batch(
     project: str,
     items: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """Record multiple ideas atomically. Each item can include title, description, category, priority, and tags."""
+    """Record multiple ideas atomically. Each item can include title, description, category, priority, tags, and prompt."""
     with get_database() as conn:
         return ideas.record_ideas_batch(conn, project, items)
 
@@ -75,7 +77,7 @@ def list_ideas(
 
 
 @server.tool(
-    description="Search ideas by title, description or tags (case-insensitive substring match)."
+    description="Search ideas by title, description, tags or prompt (case-insensitive substring match)."
 )
 def search_ideas(query: str, project: str | None = None) -> dict[str, Any]:
     """Search the vault, optionally scoped to one project."""
@@ -84,7 +86,7 @@ def search_ideas(query: str, project: str | None = None) -> dict[str, Any]:
 
 
 @server.tool(
-    description="Update an existing idea's title, description, category, priority, or tags."
+    description="Update an existing idea's title, description, category, priority, tags, or prompt."
 )
 def update_idea(
     idea_id: int,
@@ -93,11 +95,12 @@ def update_idea(
     category: str | None = None,
     priority: str | None = None,
     tags: list[str] | None = None,
+    prompt: str | None = None,
 ) -> dict[str, Any]:
     """Update an existing idea's fields by id."""
     with get_database() as conn:
         return ideas.update_idea(
-            conn, idea_id, title, description, category, priority, tags
+            conn, idea_id, title, description, category, priority, tags, prompt
         )
 
 

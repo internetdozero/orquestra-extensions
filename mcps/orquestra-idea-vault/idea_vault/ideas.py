@@ -41,6 +41,7 @@ def record_idea(
     priority: str = "medium",
     tags: Iterable[str] | str | None = None,
     status: str = "open",
+    prompt: str | None = None,
 ) -> dict[str, Any]:
     """Insert one idea and return the stored row with a confirmation message."""
     project = require_text(project, "project")
@@ -51,9 +52,9 @@ def record_idea(
     completed_at = "CURRENT_TIMESTAMP" if status == "completed" else "NULL"
     cursor = conn.execute(
         "INSERT INTO ideas (project, title, description, category, priority, tags, "
-        f"status, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, {completed_at})",
+        f"status, completed_at, prompt) VALUES (?, ?, ?, ?, ?, ?, ?, {completed_at}, ?)",
         (project, title, str(description or "").strip(), category, priority, dump_tags(tags),
-         status),
+         status, str(prompt or "").strip()),
     )
     row = conn.execute("SELECT * FROM ideas WHERE id = ?", (cursor.lastrowid,)).fetchone()
     data = idea_dict(row)
@@ -92,6 +93,7 @@ def record_ideas_batch(
                 priority=priority,
                 tags=tags,
                 status=status,
+                prompt=item.get("prompt"),
             )
             recorded.append(data)
         conn.execute(f"RELEASE SAVEPOINT {savepoint_name}")
@@ -163,9 +165,9 @@ def search_ideas(
     text = require_text(query, "query")
     pattern = "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
     clauses = [
-        "(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\')"
+        "(title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags LIKE ? ESCAPE '\\' OR prompt LIKE ? ESCAPE '\\')"
     ]
-    params: list[Any] = [pattern, pattern, pattern]
+    params: list[Any] = [pattern, pattern, pattern, pattern]
     if project:
         clauses.append("project = ?")
         params.append(require_text(project, "project"))
@@ -217,6 +219,7 @@ def update_idea(
     category: str | None = None,
     priority: str | None = None,
     tags: Iterable[str] | str | None = None,
+    prompt: str | None = None,
 ) -> dict[str, Any]:
     """Update an idea's fields and return the updated row (completed_at untouched)."""
     clauses: list[str] = ["updated_at = CURRENT_TIMESTAMP"]
@@ -236,6 +239,9 @@ def update_idea(
     if tags is not None:
         clauses.append("tags = ?")
         params.append(dump_tags(tags))
+    if prompt is not None:
+        clauses.append("prompt = ?")
+        params.append(str(prompt).strip())
 
     params.append(int(idea_id))
     cursor = conn.execute(
@@ -294,6 +300,18 @@ def export_ideas_markdown(conn: sqlite3.Connection, project: str) -> dict[str, A
         lines.append("")
     if not ideas:
         lines.append("_No open or in-progress ideas._")
+    prompted = [idea for idea in ideas if idea.get("prompt")]
+    if prompted:
+        lines.extend(["## Builder Prompts", ""])
+        for idea in prompted:
+            lines.extend([
+                f"### Builder Prompt — {idea['title']} `#{idea['id']}`",
+                "",
+                "```",
+                idea["prompt"],
+                "```",
+                "",
+            ])
 
     return {
         "project": project,
