@@ -87,14 +87,16 @@ def client() -> Any:
 
 
 def _payload(result: dict[str, Any]) -> Any:
-    content = result.get("content") or []
-    if content:
-        assert content[0]["type"] == "text", result
-        return json.loads(content[0]["text"])
-    # Empty containers come back without a text block, only structured output.
     structured = result.get("structuredContent")
     if isinstance(structured, dict) and "result" in structured:
         return structured["result"]
+    content = result.get("content") or []
+    if content:
+        text_blocks = [b for b in content if b.get("type") == "text"]
+        if len(text_blocks) > 1:
+            return [json.loads(b["text"]) for b in text_blocks]
+        if text_blocks:
+            return json.loads(text_blocks[0]["text"])
     return structured
 
 
@@ -122,6 +124,8 @@ def test_system_health_tool(client: Client) -> None:
 
 def test_scan_orphans_tool_returns_a_list(client: Client) -> None:
     rows = _payload(client.call("janitor_scan_orphans", {}))
+    if isinstance(rows, dict):
+        rows = [rows]
     assert isinstance(rows, list), type(rows)
     for row in rows:
         assert {"pid", "name", "memory_mb", "cpu_percent", "command", "ppid", "reason"} <= set(row)

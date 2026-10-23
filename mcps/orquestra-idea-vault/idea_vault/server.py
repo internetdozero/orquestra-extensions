@@ -91,12 +91,21 @@ def list_ideas(
     status: StatusFilter = "open",
     category: Category | None = None,
     priority: Priority | None = None,
+    limit: int = 200,
+    offset: int = 0,
     compact: bool = False,
 ) -> dict[str, Any]:
     """List ideas. status: open|in_progress|completed|archived|all."""
     with get_database() as conn:
         return ideas.list_ideas(
-            conn, project, status, category, priority, compact=compact
+            conn,
+            project,
+            status,
+            category,
+            priority,
+            limit=limit,
+            offset=offset,
+            compact=compact,
         )
 
 

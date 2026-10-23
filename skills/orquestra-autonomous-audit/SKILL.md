@@ -37,8 +37,8 @@ When triggered (e.g. `/autonomous-audit [duration] [scopes]`):
    - Standard Conventional Commits (`fix(scope): ...`, `perf(scope): ...`, `refactor(scope): ...`).
    - **STRICTLY FORBIDDEN:** Running `git push` unless explicitly ordered by the operator.
 3. **Reproduction Oracle Mandatory:**
-   - Every behavioral fix MUST have a failing test before the patch that passes after the patch (Rust `#[test]`, `node --test`, `pytest`).
-   - Non-behavioral cleanups (dead code, configs) require a captured command showing defect elimination (e.g. `rg`).
+   - Every behavioral fix MUST have a failing test before the patch that passes after the patch (Rust `#[test]`, `rtk node --test`, `rtk pytest`).
+   - Non-behavioral cleanups (dead code, configs) require a captured command showing defect elimination (e.g. `rtk rg`).
    - Pure prose is not proof.
 4. **RAM & Workspace Safety:**
    - NEVER write scratch or temporary test files to RAM-backed `/tmp/`. Use `/var/tmp/testing/` or local test fixtures.
@@ -115,7 +115,7 @@ During deep sweeps, the auditor will inevitably uncover broader architectural im
      `record_idea(project="<project>", title="<title>", description="<details>", category="<category>", priority="<priority>")`
    - **Post Blackboard Alerts:** If an issue requires attention from a different specialist agent or a peer working concurrently, post an asynchronous note via:
      `post_board_note(note="[Audit Alert] ...")`
-   - **Task Lifecycle:** If the operator triggered the audit to address an existing Idea Vault item, update its status (`in_progress` on kickoff, `completed` on verified negative/resolution).
+   - **Task Lifecycle:** If the operator triggered the audit to address an existing Idea Vault item, update its status (`update_idea_status(idea_id=<ID>, status="in_progress")` on kickoff, `update_idea_status(idea_id=<ID>, status="completed")` on verified negative/resolution).
 
 2. **When `idea-vault` MCP is absent (Graceful Zero-Dependency Fallback):**
    - The absence of the MCP **must NEVER halt, block, or degrade** the audit shift.

@@ -291,3 +291,26 @@ def test_record_ideas_batch(conn):
         ideas.record_ideas_batch(conn, "BatchProject", bad_items)
     count_after = conn.execute("SELECT COUNT(*) FROM ideas").fetchone()[0]
     assert count_after == count_before
+
+
+def test_list_ideas_offset_pagination(conn):
+    _record(conn, title="Idea 1", priority="critical")
+    _record(conn, title="Idea 2", priority="high")
+    _record(conn, title="Idea 3", priority="low")
+
+    all_ideas = ideas.list_ideas(conn, project="OrquestraAI", limit=10, offset=0)
+    assert all_ideas["count"] == 3
+    assert [i["title"] for i in all_ideas["ideas"]] == ["Idea 1", "Idea 2", "Idea 3"]
+
+    offset_one = ideas.list_ideas(conn, project="OrquestraAI", limit=10, offset=1)
+    assert offset_one["count"] == 2
+    assert [i["title"] for i in offset_one["ideas"]] == ["Idea 2", "Idea 3"]
+
+    offset_two = ideas.list_ideas(conn, project="OrquestraAI", limit=10, offset=2)
+    assert offset_two["count"] == 1
+    assert [i["title"] for i in offset_two["ideas"]] == ["Idea 3"]
+
+    offset_past = ideas.list_ideas(conn, project="OrquestraAI", limit=10, offset=5)
+    assert offset_past["count"] == 0
+    assert offset_past["ideas"] == []
+

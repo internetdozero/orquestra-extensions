@@ -28,3 +28,8 @@ Group by capability. The entry point only wires modules. A shared module exists 
 - A section banner inside a file means it is already two modules.
 - A nested AGENTS.md is only for a subtree with different commands or a different cap. The closest file wins.
 - Commit each coherent slice locally. Do not push unless asked.
+
+## Temporary Files & Storage Policy (Strict)
+
+- **Forbidden Path:** NEVER create or write scratch files, mock repositories, temporary test workspaces, or artifacts inside `/tmp/`. On this Linux machine, `/tmp` is a RAM-backed `tmpfs`; consuming it directly exhausts physical RAM and causes the kernel OOM Killer to crash critical user processes.
+- **Designated Scratch Path:** All temporary files, scratch scripts, mock repositories, and sandbox tests MUST use `/var/tmp/testing/` (create if absent: `mkdir -p /var/tmp/testing`). Always remove transient test assets upon test completion.

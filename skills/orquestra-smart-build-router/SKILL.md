@@ -16,7 +16,7 @@ Categorize modified files into one of the following domains:
 
 ### A. Frontend / UI Only (`src/`, `*.tsx`, `*.ts`, `*.css`, `*.html`, `public/`)
 - **Action:** Verify types and bundle integrity only.
-- **Run:** `npm run build:fast` (or `tsc --noEmit && vite build`).
+- **Run:** `npm run build` (validates UI and TypeScript without triggering `cargo build` in Rust, preserving hardware thermally; or `tsc --noEmit && vite build`).
 - **NEVER:**
   - DO NOT run `cargo test`, `cargo check`, or Rust compiler passes.
   - DO NOT trigger full native application release builds (`npm run build:release`, `rtk npx tauri build --no-bundle`).
@@ -47,7 +47,7 @@ Categorize modified files into one of the following domains:
 
 1. **Incremental Over Release:**
    - In day-to-day development, never run full release compilation (e.g. LTO passes, stripping, bundling) merely to test code.
-   - Prefer incremental dev builds (`rtk cargo check`, `npm run build:fast`, `npm run dev`).
+   - Prefer incremental dev builds (`rtk cargo check`, `npm run build`, `npm run dev`).
 2. **Zero-Heat Cloud Builds (GitHub Actions):**
    - When a full production release binary is required on thermal-sensitive hardware (preventing CPU throttling at ~93 °C), prefer triggering the remote GitHub Actions build:
      ```bash

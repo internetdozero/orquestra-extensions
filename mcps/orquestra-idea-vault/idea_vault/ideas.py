@@ -117,6 +117,7 @@ def list_ideas(
     category: str | None = None,
     priority: str | None = None,
     limit: int = 200,
+    offset: int = 0,
     compact: bool = False,
 ) -> dict[str, Any]:
     """List ideas by project, status, category and priority, highest priority first."""
@@ -141,8 +142,8 @@ def list_ideas(
     where = f"WHERE {' AND '.join(clauses)} " if clauses else ""
     rows = conn.execute(
         f"SELECT * FROM ideas {where}ORDER BY {PRIORITY_RANK}, created_at DESC, id DESC "
-        "LIMIT ?",
-        (*params, clamp_limit(limit, 200)),
+        "LIMIT ? OFFSET ?",
+        (*params, clamp_limit(limit, 200), max(0, int(offset or 0))),
     ).fetchall()
     if compact:
         compact_ideas = [{f: row[f] for f in COMPACT_FIELDS} for row in rows]
