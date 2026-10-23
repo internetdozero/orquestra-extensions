@@ -142,9 +142,9 @@ If `orquestra-core` is not on `PATH`, use
 | `orquestra_apply_preset` | `preset_id` | `{preset, applied, changed[], errors[]}` |
 | `orquestra_save_preset` | `name`, `description?`, `skills?`, `mcps?`, `icon?` | `{id, name, description, skills[], mcps[], icon, builtin: false, ...}` |
 | `orquestra_delete_preset` | `preset_id` | `{id, deleted, message}` (built-ins are protected) |
-| `orquestra_vault_list` | — | `[{id, label, enabled, health, total_keys, masked_keys[], ...}]`, no secrets |
-| `orquestra_vault_http` | `service_id`, `endpoint`, `method?`, `headers?`, `body?` | `{status, headers, body, used_key_index}`, scrubbed |
-| `orquestra_vault_exec` | `service_id`, `command`, `timeout?` | `{code, stdout, stderr, used_key_index}`, scrubbed |
+| `orquestra_vault_list` | — | `[{id, label, enabled, health, totalKeys, maskedKeys[], ...}]` (camelCase, as the binary emits), no secrets |
+| `orquestra_vault_http` | `service_id`, `endpoint`, `method?`, `headers?`, `body?` | `{status, headers, body, usedKeyIndex}`, scrubbed |
+| `orquestra_vault_exec` | `service_id`, `command`, `timeout?` | `{code, stdout, stderr, usedKeyIndex}`, scrubbed |
 | `orquestra_vault_set_enabled` | `service_id`, `enabled` | `{id, label, enabled, ...}`, no secrets |
 | `orquestra_deploy_bridge` | — | `{deployed, harnesses[], errors[]}` |
 
