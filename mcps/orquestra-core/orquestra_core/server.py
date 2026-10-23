@@ -33,8 +33,8 @@ orquestra_deploy_bridge runs headless bridge fusion: backs up and symlinks
 every installed harness into the fleet projection.
 
 Presets: orquestra_list_presets lists all built-in and custom mission presets;
-orquestra_apply_preset activates a named preset (stealth, rust-dev,
-web-fullstack, full-power) across all harnesses via the native binary;
+orquestra_apply_preset activates a named preset (full-power or a custom
+id) across all harnesses via the native binary;
 orquestra_save_preset creates or updates a custom preset in presets.json and
 orquestra_delete_preset removes one (built-ins are protected).
 """
@@ -119,15 +119,14 @@ def orquestra_fleet_status() -> dict[str, Any]:
     )
 )
 def orquestra_list_presets() -> list[dict[str, Any]]:
-    """Returns built-ins (stealth, rust-dev, web-fullstack, full-power) merged with any
-    custom presets defined in ~/.orquestra/presets.json."""
+    """Returns the built-in full-power preset merged with any custom presets
+    defined in ~/.orquestra/presets.json."""
     return presets.list_presets()
 
 
 @tool(
     description=(
-        "Apply a curated mission preset (e.g. stealth, rust-dev, web-fullstack, full-power) "
-        "across all harnesses."
+        "Apply a mission preset (full-power or a custom id) across all harnesses."
     )
 )
 def orquestra_apply_preset(preset_id: str) -> dict[str, Any]:

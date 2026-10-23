@@ -79,13 +79,36 @@ elif args == ["--bridge-status"]:
     ]))
 elif len(args) == 2 and args[0] == "--preset":
     preset_id = args[1]
-    known = {"stealth", "rust-dev", "web-fullstack", "full-power"}
+    known = {"full-power"}
     if preset_id not in known:
         print(f"unknown preset: {preset_id}", file=sys.stderr)
         sys.exit(1)
     print(json.dumps({"preset": preset_id, "applied": True, "changed": [], "errors": []}))
 elif args == ["--bridge-deploy"]:
     print(json.dumps({"deployed": True, "harnesses": ["codex", "claude"], "errors": []}))
+elif args[:2] == ["vault", "list"]:
+    print(json.dumps([{\
+        "id": "svc-a", "label": "Service A", "preset": "github", \
+        "enabled": True, "total_keys": 1, "masked_keys": ["gh****"], \
+        "health": "ok", "key_health": [], "active_key_index": 0}]))
+elif args[:2] == ["vault", "http"]:
+    opts = dict(zip(args[2::2], args[3::2]))
+    service = opts.get("--service", "")
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    method = opts.get("--method", "GET")
+    if method not in ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"):
+        print(f"unsupported HTTP method: {method}", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({"status": 200, "headers": {}, "body": "ok", "used_key_index": 0}))
+elif args[:2] == ["vault", "exec"]:
+    rest = [a for a in args[2:] if a != "--"]
+    service = rest[0] if rest else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({"code": 0, "stdout": "", "stderr": "", "used_key_index": 0}))
 else:
     print(f"unsupported arguments: {args}", file=sys.stderr)
     sys.exit(2)

@@ -68,3 +68,47 @@ def apply_preset(preset_id: str) -> dict[str, Any]:
 def deploy_bridge() -> dict[str, Any]:
     """Back up and symlink every installed harness into the fleet projection."""
     return _json(run("--bridge-deploy"), "--bridge-deploy")
+
+
+def vault_list() -> list[dict[str, Any]]:
+    """Masked credential services; zero secrets reach the caller."""
+    report = _json(run("vault", "list", "--json"), "vault list")
+    if not isinstance(report, list):
+        raise BridgeError("vault list did not return a list of services")
+    return report
+
+
+def vault_http(
+    service: str,
+    endpoint: str,
+    method: str = "GET",
+    headers_json: str | None = None,
+    body: str | None = None,
+    key_tag: str | None = None,
+) -> dict[str, Any]:
+    """Blind HTTP with the stored credential injected inside the binary."""
+    argv = [
+        "vault", "http",
+        "--service", service,
+        "--endpoint", endpoint,
+        "--method", method,
+        "--json",
+    ]
+    if headers_json is not None:
+        argv += ["--headers", headers_json]
+    if body is not None:
+        argv += ["--body", body]
+    if key_tag is not None:
+        argv += ["--key-tag", key_tag]
+    report = _json(run(*argv), f"vault http {service}")
+    if not isinstance(report, dict):
+        raise BridgeError("vault http did not return a result object")
+    return report
+
+
+def vault_exec(service: str, command: list[str]) -> dict[str, Any]:
+    """CLI command with stored credentials injected in memory by the binary."""
+    report = _json(run("vault", "exec", service, "--", *command), f"vault exec {service}")
+    if not isinstance(report, dict):
+        raise BridgeError("vault exec did not return a result object")
+    return report

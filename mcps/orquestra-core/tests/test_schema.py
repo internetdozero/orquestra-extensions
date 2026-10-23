@@ -56,10 +56,35 @@ def test_unknown_scope_lists_the_projected_ones(mock_home: Path) -> None:
     assert "global" in message and "codex" in message
 
 
-def test_unknown_vault_service_lists_the_configured_ones(mock_home: Path) -> None:
+def test_unknown_vault_service_keeps_the_binary_reason(mock_home: Path) -> None:
     with pytest.raises(ToolError) as caught:
         _call("orquestra_vault_exec", service_id="nope", command=["true"])
-    assert "unknown vault service 'nope'" in str(caught.value)
+    assert "unknown vault service: nope" in str(caught.value)
+
+
+def test_vault_tools_roundtrip_through_the_binary(mock_home: Path) -> None:
+    import json
+
+    services = _call("orquestra_vault_list")
+    assert services.is_error is False
+    rows = services.structured_content
+    if isinstance(rows, dict):  # list results arrive wrapped in {"result": [...]}
+        rows = rows["result"]
+    assert [row["id"] for row in rows] == ["svc-a"]
+    assert all("secret" not in json.dumps(row).lower() for row in rows)
+
+    http = _call(
+        "orquestra_vault_http",
+        service_id="svc-a",
+        endpoint="https://api.example.com/ping",
+        method="GET",
+    )
+    assert http.is_error is False
+    assert http.structured_content["status"] == 200
+
+    executed = _call("orquestra_vault_exec", service_id="svc-a", command=["true"])
+    assert executed.is_error is False
+    assert executed.structured_content["code"] == 0
 
 
 def test_bridge_refusal_keeps_its_reason(mock_home: Path) -> None:
@@ -86,4 +111,4 @@ def test_list_tools_still_succeed_after_the_guard(mock_home: Path) -> None:
     rows = presets.structured_content
     if isinstance(rows, dict):  # list results arrive wrapped in {"result": [...]}
         rows = rows["result"]
-    assert {"stealth", "rust-dev"} <= {row["id"] for row in rows}
+    assert {"full-power"} <= {row["id"] for row in rows}

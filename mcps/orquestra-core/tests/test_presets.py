@@ -15,19 +15,15 @@ from orquestra_core import fleet, paths, presets
 # ---------------------------------------------------------------------------
 
 
-def test_list_presets_returns_four_builtins(mock_home: Path) -> None:
+def test_list_presets_returns_only_full_power_builtin(mock_home: Path) -> None:
     rows = presets.list_presets()
-    ids = [r["id"] for r in rows]
-    assert "stealth" in ids
-    assert "rust-dev" in ids
-    assert "web-fullstack" in ids
-    assert "full-power" in ids
+    assert [r["id"] for r in rows if r.get("builtin")] == ["full-power"]
 
 
 def test_list_presets_builtin_flag(mock_home: Path) -> None:
     rows = presets.list_presets()
     builtin_ids = {r["id"] for r in rows if r.get("builtin")}
-    assert builtin_ids == {"stealth", "rust-dev", "web-fullstack", "full-power"}
+    assert builtin_ids == {"full-power"}
 
 
 def test_list_presets_no_active_when_file_absent(mock_home: Path) -> None:
@@ -64,28 +60,26 @@ def test_list_presets_merges_custom_entry(mock_home: Path) -> None:
 
 
 def test_list_presets_marks_active_preset(mock_home: Path) -> None:
-    payload = {"active": "stealth", "presets": []}
+    payload = {"active": "full-power", "presets": []}
     paths.presets_path().write_text(json.dumps(payload), encoding="utf-8")
 
     rows = presets.list_presets()
     by_id = {r["id"]: r for r in rows}
-    assert by_id["stealth"]["active"] is True
-    assert by_id["rust-dev"]["active"] is False
-    assert by_id["full-power"]["active"] is False
+    assert by_id["full-power"]["active"] is True
 
 
 def test_list_presets_custom_does_not_shadow_builtin(mock_home: Path) -> None:
     """A custom entry with a built-in id must NOT appear as a second custom row."""
     payload = {
         "active": None,
-        "presets": [{"id": "stealth", "name": "Shadowed"}],
+        "presets": [{"id": "full-power", "name": "Shadowed"}],
     }
     paths.presets_path().write_text(json.dumps(payload), encoding="utf-8")
 
     rows = presets.list_presets()
-    stealth_rows = [r for r in rows if r["id"] == "stealth"]
-    assert len(stealth_rows) == 1
-    assert stealth_rows[0]["builtin"] is True  # built-in wins
+    builtin_rows = [r for r in rows if r["id"] == "full-power"]
+    assert len(builtin_rows) == 1
+    assert builtin_rows[0]["builtin"] is True  # built-in wins
 
 
 # ---------------------------------------------------------------------------
@@ -94,15 +88,14 @@ def test_list_presets_custom_does_not_shadow_builtin(mock_home: Path) -> None:
 
 
 def test_apply_known_preset_returns_report(mock_home: Path) -> None:
-    report = presets.apply_preset("stealth")
-    assert report["preset"] == "stealth"
+    report = presets.apply_preset("full-power")
+    assert report["preset"] == "full-power"
     assert report["applied"] is True
 
 
-def test_apply_all_builtin_presets(mock_home: Path) -> None:
-    for pid in ("stealth", "rust-dev", "web-fullstack", "full-power"):
-        report = presets.apply_preset(pid)
-        assert report["applied"] is True, f"preset {pid!r} did not report applied=True"
+def test_apply_full_power_builtin(mock_home: Path) -> None:
+    report = presets.apply_preset("full-power")
+    assert report["applied"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +195,7 @@ def test_save_preset_updates_existing_entry(mock_home: Path) -> None:
 
 def test_save_preset_rejects_builtin_collision(mock_home: Path) -> None:
     with pytest.raises(ValueError, match="built-in"):
-        presets.save_preset("Stealth", skills=["rtk"])
+        presets.save_preset("Full Power", skills=["rtk"])
 
 
 def test_save_preset_needs_a_name(mock_home: Path) -> None:
@@ -238,7 +231,7 @@ def test_delete_preset_resets_active(mock_home: Path) -> None:
 
 def test_delete_preset_rejects_builtin(mock_home: Path) -> None:
     with pytest.raises(ValueError, match="Cannot delete built-in"):
-        presets.delete_preset("rust-dev")
+        presets.delete_preset("full-power")
 
 
 def test_delete_preset_not_found(mock_home: Path) -> None:
@@ -268,6 +261,6 @@ def test_save_delete_tools_roundtrip(mock_home: Path) -> None:
     assert removed.structured_content["deleted"] is True
     with pytest.raises(ToolError) as refused:
         asyncio.run(
-            server.call_tool("orquestra_delete_preset", {"preset_id": "stealth"})
+            server.call_tool("orquestra_delete_preset", {"preset_id": "full-power"})
         )
     assert "Cannot delete built-in" in str(refused.value)
