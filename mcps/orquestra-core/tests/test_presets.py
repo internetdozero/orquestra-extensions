@@ -154,6 +154,12 @@ def test_deploy_bridge_returns_deployed_true(mock_home: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
+def test_save_preset_neutralizes_hostile_names(mock_home: Path) -> None:
+    saved = presets.save_preset("../../evil", skills=["rtk"])
+    assert saved["id"] == "evil"
+    assert "/" not in saved["id"] and saved["id"] != ".."
+
+
 def test_save_preset_creates_entry(mock_home: Path) -> None:
     saved = presets.save_preset(
         "My Preset", "Operator custom", skills=["rtk"], mcps=["orquestra-core"]
