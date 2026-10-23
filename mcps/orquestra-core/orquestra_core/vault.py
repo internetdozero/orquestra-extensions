@@ -99,3 +99,16 @@ def execute_exec(
         return bridge.vault_exec(name, parts)
     except BridgeError as error:
         raise _refusal(error, name) from error
+
+
+def set_service_enabled(service_id: str, enabled: bool) -> dict[str, Any]:
+    """Flip the operator kill-switch; the blind proxy refuses disabled services."""
+    name = (service_id or "").strip()
+    if not name:
+        raise VaultRequestError("service_id must not be empty")
+    if not isinstance(enabled, bool):
+        raise VaultRequestError("enabled must be true or false")
+    try:
+        return bridge.vault_set_enabled(name, enabled)
+    except BridgeError as error:
+        raise _refusal(error, name) from error

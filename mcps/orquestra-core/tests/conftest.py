@@ -109,6 +109,16 @@ elif args[:2] == ["vault", "exec"]:
         print(f"unknown vault service: {service}", file=sys.stderr)
         sys.exit(1)
     print(json.dumps({"code": 0, "stdout": "", "stderr": "", "used_key_index": 0}))
+elif args[:2] == ["vault", "set-enabled"]:
+    service = args[2] if len(args) > 2 else ""
+    state = args[3] if len(args) > 3 else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    if state not in ("on", "off"):
+        print(f"expected on|off, got {state}", file=sys.stderr)
+        sys.exit(2)
+    print(json.dumps({"id": service, "label": "Service A", "enabled": state == "on"}))
 else:
     print(f"unsupported arguments: {args}", file=sys.stderr)
     sys.exit(2)

@@ -28,6 +28,10 @@ deploy the catalog.
 Instructions: orquestra_read_instructions returns the master AGENTS.md and
 orquestra_append_mission_rule appends a scoped directive with a backup.
 
+Vault: orquestra_vault_list shows credential services with masked keys,
+orquestra_vault_http / orquestra_vault_exec spend a stored key blind, and
+orquestra_vault_set_enabled flips the kill-switch the proxy enforces.
+
 Fleet: orquestra_fleet_status reports the link state of every harness.
 orquestra_deploy_bridge runs headless bridge fusion: backs up and symlinks
 every installed harness into the fleet projection.
@@ -244,6 +248,14 @@ def orquestra_vault_exec(
 ) -> dict[str, Any]:
     """service_id: e.g. 'github', 'cloudflare', 'inception-labs'. Command runs with secret in env, output scrubbed."""
     return vault.execute_exec(service_id, command, timeout)
+
+
+@tool(
+    description="Flip a vault credential service kill-switch. The blind proxy refuses disabled services."
+)
+def orquestra_vault_set_enabled(service_id: str, enabled: bool) -> dict[str, Any]:
+    """service_id: e.g. 'github'. Returns the service with its new enabled state; no secrets."""
+    return vault.set_service_enabled(service_id, enabled)
 
 
 def main(argv: list[str] | None = None) -> int:

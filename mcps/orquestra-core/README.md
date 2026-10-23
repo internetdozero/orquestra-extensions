@@ -145,6 +145,7 @@ If `orquestra-core` is not on `PATH`, use
 | `orquestra_vault_list` | — | `[{id, label, enabled, health, total_keys, masked_keys[], ...}]`, no secrets |
 | `orquestra_vault_http` | `service_id`, `endpoint`, `method?`, `headers?`, `body?` | `{status, headers, body, used_key_index}`, scrubbed |
 | `orquestra_vault_exec` | `service_id`, `command`, `timeout?` | `{code, stdout, stderr, used_key_index}`, scrubbed |
+| `orquestra_vault_set_enabled` | `service_id`, `enabled` | `{id, label, enabled, ...}`, no secrets |
 | `orquestra_deploy_bridge` | — | `{deployed, harnesses[], errors[]}` |
 
 `scope` is `global` or a harness id discovered from `~/.orquestra/active`

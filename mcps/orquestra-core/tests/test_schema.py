@@ -87,6 +87,28 @@ def test_vault_tools_roundtrip_through_the_binary(mock_home: Path) -> None:
     assert executed.structured_content["code"] == 0
 
 
+def test_vault_set_enabled_roundtrip(mock_home: Path) -> None:
+    off = _call("orquestra_vault_set_enabled", service_id="svc-a", enabled=False)
+    assert off.is_error is False
+    assert off.structured_content["enabled"] is False
+
+    on = _call("orquestra_vault_set_enabled", service_id="svc-a", enabled=True)
+    assert on.is_error is False
+    assert on.structured_content["enabled"] is True
+
+
+def test_vault_set_enabled_rejects_unknown_service(mock_home: Path) -> None:
+    with pytest.raises(ToolError) as caught:
+        _call("orquestra_vault_set_enabled", service_id="nope", enabled=True)
+    assert "unknown vault service: nope" in str(caught.value)
+
+
+def test_vault_set_enabled_rejects_empty_id(mock_home: Path) -> None:
+    with pytest.raises(ToolError) as caught:
+        _call("orquestra_vault_set_enabled", service_id="  ", enabled=True)
+    assert "must not be empty" in str(caught.value)
+
+
 def test_bridge_refusal_keeps_its_reason(mock_home: Path) -> None:
     with pytest.raises(ToolError) as caught:
         _call("orquestra_apply_preset", preset_id="ghost")

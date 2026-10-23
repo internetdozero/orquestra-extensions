@@ -67,6 +67,7 @@ When the `orquestra-core` MCP server is active, prefer calling typed tools over 
 - `orquestra_vault_list()`: List credential services with health, kill-switch state and masked keys. No secrets are ever returned.
 - `orquestra_vault_http(service_id, endpoint, method="GET", headers=None, body=None)`: Blind HTTP request; the binary injects the stored key and scrubs it from the response.
 - `orquestra_vault_exec(service_id, command)`: Run a CLI command with stored credentials injected in memory; output is scrubbed.
+- `orquestra_vault_set_enabled(service_id, enabled)`: Flip the service kill-switch; the blind proxy refuses disabled services.
 - Never ask the operator to paste a secret into chat: register it in the Vault and reference it by `service_id`.
 
 ### Mission presets

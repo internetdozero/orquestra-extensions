@@ -112,3 +112,15 @@ def vault_exec(service: str, command: list[str]) -> dict[str, Any]:
     if not isinstance(report, dict):
         raise BridgeError("vault exec did not return a result object")
     return report
+
+
+def vault_set_enabled(service: str, enabled: bool) -> dict[str, Any]:
+    """Flip the operator kill-switch; the blind proxy refuses disabled services."""
+    state = "on" if enabled else "off"
+    report = _json(
+        run("vault", "set-enabled", service, state, "--json"),
+        f"vault set-enabled {service}",
+    )
+    if not isinstance(report, dict):
+        raise BridgeError("vault set-enabled did not return a service object")
+    return report
