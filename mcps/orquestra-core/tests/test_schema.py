@@ -109,6 +109,16 @@ def test_vault_set_enabled_rejects_empty_id(mock_home: Path) -> None:
     assert "must not be empty" in str(caught.value)
 
 
+def test_vault_set_enabled_rejects_non_bool(mock_home: Path) -> None:
+    # The MCP framework coerces tool inputs to bool before the body runs,
+    # so this guard only fires for direct library callers: exercise it there.
+    from orquestra_core import vault
+    from orquestra_core.errors import VaultRequestError
+
+    with pytest.raises(VaultRequestError, match="must be true or false"):
+        vault.set_service_enabled("svc-a", "yes")  # type: ignore[arg-type]
+
+
 def test_bridge_refusal_keeps_its_reason(mock_home: Path) -> None:
     with pytest.raises(ToolError) as caught:
         _call("orquestra_apply_preset", preset_id="ghost")
