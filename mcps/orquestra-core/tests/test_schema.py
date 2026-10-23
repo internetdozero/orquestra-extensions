@@ -86,6 +86,11 @@ def test_vault_tools_roundtrip_through_the_binary(mock_home: Path) -> None:
     assert executed.is_error is False
     assert executed.structured_content["code"] == 0
 
+    # String form is shlex-split, never shelled: same argv shape reaches the binary.
+    as_string = _call("orquestra_vault_exec", service_id="svc-a", command="true")
+    assert as_string.is_error is False
+    assert as_string.structured_content["code"] == 0
+
 
 def test_vault_set_enabled_roundtrip(mock_home: Path) -> None:
     off = _call("orquestra_vault_set_enabled", service_id="svc-a", enabled=False)
