@@ -36,7 +36,10 @@ When shell interaction is required or MCP tools are unavailable, use the native 
 - `rtk orquestra --mcp-status`: Print the master MCP catalog and enabled states as JSON.
 - `rtk orquestra --mcp-deploy`: Compile active MCPs from `mcps.json` into all harness configuration files.
 - `rtk orquestra --mcp-set <id> <scope> <on|off>`: Toggle individual MCP servers (`scope`: `global` or a specific harness like `antigravity`, `state`: `on` or `off`).
-- `rtk orquestra --preset <id>`: Apply a curated or custom mission preset (e.g., `rtk orquestra --preset stealth`, `full-stack`, `offline-guard`).
+- `rtk orquestra --preset <id>`: Apply a mission preset (e.g., `rtk orquestra --preset full-power` or a custom id from `presets.json`).
+- `rtk orquestra vault list`: List credential services with health and masked keys (zero secrets).
+- `rtk orquestra vault http --service <id> --endpoint <url> [--method GET]`: Blind HTTP request with the stored credential injected by the binary.
+- `rtk orquestra vault exec <service> [--] <argv…>`: Run a command with stored credentials injected in memory; output is scrubbed.
 
 ## 3. MCP Control Plane (`orquestra-core`)
 
@@ -60,16 +63,25 @@ When the `orquestra-core` MCP server is active, prefer calling typed tools over 
 - `orquestra_read_instructions()`: Read the master `~/.orquestra/AGENTS.md` inherited across all harnesses.
 - `orquestra_append_mission_rule(section_title, rule_content)`: Append a scoped directive to a section in `AGENTS.md` with automated timestamped backup.
 
+### Credentials (blind vault)
+- `orquestra_vault_list()`: List credential services with health, kill-switch state and masked keys. No secrets are ever returned.
+- `orquestra_vault_http(service_id, endpoint, method="GET", headers=None, body=None)`: Blind HTTP request; the binary injects the stored key and scrubs it from the response.
+- `orquestra_vault_exec(service_id, command)`: Run a CLI command with stored credentials injected in memory; output is scrubbed.
+- Never ask the operator to paste a secret into chat: register it in the Vault and reference it by `service_id`.
+
+### Mission presets
+- `orquestra_list_presets()`: Built-in `full-power` plus custom profiles from `~/.orquestra/presets.json`.
+- `orquestra_apply_preset(preset_id)`: Activate a preset across all harnesses.
+- `orquestra_save_preset(name, ...)` / `orquestra_delete_preset(preset_id)`: Manage custom presets (built-ins are protected).
+
 ## 4. Mission Presets
 
 Mission presets allow instantaneous switching of active skills and MCP servers to match current operational goals, preserving context tokens and avoiding prompt bloat:
 
 - **Dynamic Orchestration:** Presets atomically reconfigure both the skills projections (`active/<harness>/`) and the outward MCP configurations (`mcps.json` -> harness configs) in a single operation.
 - **Curated & Workflow Profiles:**
-  - `stealth`: Ultra-lightweight profile disabling heavy MCPs and skills for minimal footprint (`rtk`, `headroom`, `idea-vault`, `orquestra-core`).
-  - `rust-dev` / `web-fullstack`: Task-tailored profiles loading domain-specific tooling, cloud endpoints, and browser automation.
-  - `full-power`: Maximizes fleet capabilities by enabling every skill in the vault and every registered MCP server.
-  - `offline-guard` / custom profiles: Operator-defined presets in `~/.orquestra/presets.json` enforcing strict local-only execution or specialized workflows.
+  - `full-power`: The only built-in. Maximizes fleet capabilities by enabling every skill in the vault and every registered MCP server.
+  - Custom profiles: Operator-defined presets in `~/.orquestra/presets.json` (see `orquestra_save_preset`), e.g. a minimal `review-mode` or a local-only profile.
 
 ## 5. Mandatory Rules of Engagement
 

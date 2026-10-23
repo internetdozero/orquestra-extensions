@@ -140,6 +140,11 @@ If `orquestra-core` is not on `PATH`, use
 | `orquestra_delete_mcp` | `mcp_id` | `{id, deleted, changed[], targets, servers, backup}` |
 | `orquestra_list_presets` | — | `[{id, name, description, skills[], mcps[], all_skills, all_mcps, icon, builtin, active}]` |
 | `orquestra_apply_preset` | `preset_id` | `{preset, applied, changed[], errors[]}` |
+| `orquestra_save_preset` | `name`, `description?`, `skills?`, `mcps?`, `icon?` | `{id, name, description, skills[], mcps[], icon, builtin: false, ...}` |
+| `orquestra_delete_preset` | `preset_id` | `{id, deleted, message}` (built-ins are protected) |
+| `orquestra_vault_list` | — | `[{id, label, enabled, health, total_keys, masked_keys[], ...}]`, no secrets |
+| `orquestra_vault_http` | `service_id`, `endpoint`, `method?`, `headers?`, `body?` | `{status, headers, body, used_key_index}`, scrubbed |
+| `orquestra_vault_exec` | `service_id`, `command`, `timeout?` | `{code, stdout, stderr, used_key_index}`, scrubbed |
 | `orquestra_deploy_bridge` | — | `{deployed, harnesses[], errors[]}` |
 
 `scope` is `global` or a harness id discovered from `~/.orquestra/active`
@@ -167,9 +172,8 @@ Which harnesses are currently bridged?
 
 ```
 List all available mission presets and tell me which one is active.
-Apply the stealth preset to minimize my context footprint.
-Switch to the rust-dev preset for this session.
 Apply full-power and then list my active skills to confirm.
+Save the current skill selection as a preset called "review-mode".
 Run bridge deploy to sync all harness symlinks.
 ```
 
@@ -194,6 +198,9 @@ Run bridge deploy to sync all harness symlinks.
 - `orquestra_delete_mcp` drops the entry but deliberately leaves its managed id
   for the deploy: that membership is what marks the block stale, so the
   serializers purge it from every harness config.
+- The vault tools never touch `vault.json`: they delegate to `orquestra vault
+  <list|http|exec>`, so the sealed credential file stays inside the native
+  backend and only masked metadata or scrubbed results reach the agent.
 - `ORQUESTRA_HOME` relocates the whole tree (used by the test suite).
 
 ## Development
