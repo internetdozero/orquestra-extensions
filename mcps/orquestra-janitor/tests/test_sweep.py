@@ -130,9 +130,20 @@ def test_real_class_sweep_terminates_only_flagged_pids(
 
 def test_survivor_without_force_is_reported_not_killed() -> None:
     # SIGTERM-ignoring process; bash would hit the shell denylist, so use python.
+    # Spawned through a neutrally-named symlink: the denylist matches protected
+    # tokens against the command line, and sys.executable may live under such
+    # a path (e.g. a checkout dir containing "orquestra"), which would refuse
+    # the fixture for reasons unrelated to what this test exercises.
+    # On disk (not RAM-backed /tmp): repo workspace safety rule.
+    scratch = Path(f"/var/tmp/testing/janitor-fixture-{os.getpid()}")
+    scratch.mkdir(parents=True, exist_ok=True)
+    interpreter = scratch / "fixture-python"
+    if interpreter.is_symlink() or interpreter.exists():
+        interpreter.unlink()
+    interpreter.symlink_to(sys.executable)
     proc = subprocess.Popen(
         [
-            sys.executable,
+            str(interpreter),
             "-c",
             "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(300)",
         ],
@@ -153,6 +164,12 @@ def test_survivor_without_force_is_reported_not_killed() -> None:
     finally:
         if proc.poll() is None:
             os.killpg(proc.pid, signal.SIGKILL)
+            proc.wait(timeout=10)
+        interpreter.unlink(missing_ok=True)
+        try:
+            scratch.rmdir()
+        except OSError:
+            pass
             proc.wait(timeout=10)
 
 
