@@ -1,10 +1,8 @@
 """Server-side Exa search: one query in, titled results with cited highlights out.
 
-The Exa client reads ``EXA_API_KEY`` from the process environment, falling back
-to a local ``.env`` located by :mod:`web_search.env_file` so an MCP client that
-passes no env block still works. This module is imported only by the MCP server
-and its CLI, never by a browser bundle or a template, so the key stays
-operator-side.
+Search uses an enabled Exa credential from OrquestraAI's blind vault first.
+When that is unavailable, the Exa client reads ``EXA_API_KEY`` from the process
+environment or a local ``.env``. The key stays operator-side in both paths.
 """
 
 from __future__ import annotations
@@ -16,7 +14,7 @@ from typing import Any, Protocol
 from exa_py import Exa
 from requests import RequestException
 
-from . import env_file
+from . import env_file, orquestra_vault
 
 ENV_VAR = "EXA_API_KEY"
 DEFAULT_NUM_RESULTS = 5
@@ -68,6 +66,9 @@ def client(searcher: Searcher | None = None) -> Searcher:
     return Exa(api_key())
 
 
+_DEFAULT_CLIENT = client
+
+
 def _status_of(error: Exception) -> int | None:
     """Recover the HTTP status Exa reported; exa-py raises ValueError with it inline."""
     match = _STATUS_CODE.search(str(error))
@@ -86,16 +87,30 @@ def _as_search_error(error: Exception) -> SearchError:
     return SearchError(f"Exa search failed: {error}")
 
 
+def _field(row: Any, name: str, default: Any = None) -> Any:
+    return row.get(name, default) if isinstance(row, dict) else getattr(row, name, default)
+
+
 def _result(row: Any) -> dict[str, Any]:
     """Keep only what the feature shows, and fall back to the URL when untitled."""
-    url = row.url
+    url = _field(row, "url", "")
+    title = _field(row, "title")
+    highlights = _field(row, "highlights") or []
     return {
-        "title": row.title or url,
+        "title": title or url,
         "url": url,
-        "published_date": row.published_date,
-        "author": row.author,
-        "highlights": [passage for passage in (row.highlights or []) if passage],
+        "published_date": _field(row, "publishedDate", _field(row, "published_date")),
+        "author": _field(row, "author"),
+        "highlights": [passage for passage in highlights if passage],
     }
+
+
+def _report(query: str, rows: list[Any]) -> dict[str, Any]:
+    results = [_result(row) for row in rows]
+    report: dict[str, Any] = {"query": query, "count": len(results), "results": results}
+    if not results:
+        report["note"] = "Exa returned no results for this query."
+    return report
 
 
 def run_search(
@@ -128,20 +143,21 @@ def run_search(
     if start_published_date:
         options["start_published_date"] = start_published_date
 
+    # Keep injected/monkeypatched Exa clients deterministic; production uses
+    # OrquestraAI's credential vault before falling back to env/.env.
+    if searcher is None and client is _DEFAULT_CLIENT:
+        vault_response = orquestra_vault.search(
+            cleaned, num_results, include_domains, start_published_date
+        )
+        if vault_response is not None:
+            return _report(cleaned, vault_response["results"])
+
     try:
         response = client(searcher).search(cleaned, **options)
     except Exception as error:  # every Exa failure becomes one readable state
         raise _as_search_error(error) from error
 
-    results = [_result(row) for row in (response.results or [])]
-    report: dict[str, Any] = {
-        "query": cleaned,
-        "count": len(results),
-        "results": results,
-    }
-    if not results:
-        report["note"] = "Exa returned no results for this query."
-    return report
+    return _report(cleaned, response.results or [])
 
 
 def render_markdown(report: dict[str, Any]) -> str:

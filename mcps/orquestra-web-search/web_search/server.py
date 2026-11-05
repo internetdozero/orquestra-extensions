@@ -24,9 +24,10 @@ include_domains and start_published_date are hard constraints — pass them only
 when a domain or a date floor is genuinely required. Search has no pagination,
 so widen num_results rather than asking for a next page.
 
-The tool reads EXA_API_KEY from the server's environment, then from a local
-.env next to the installed package or above the working directory
-(WEB_SEARCH_ENV_FILE overrides that lookup). A missing key, a rejected key
+The tool first uses an enabled Exa-preset credential from OrquestraAI's blind
+vault. If unavailable, it reads EXA_API_KEY from the server's environment,
+then from a local .env next to the installed package or above the working
+directory (WEB_SEARCH_ENV_FILE overrides that lookup). A missing key, a rejected key
 (401), exhausted credits (402) and rate limiting (429) come back as a tool
 error carrying the status and what to do about it, never as an empty result
 list.

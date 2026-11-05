@@ -46,10 +46,35 @@ def test_missing_key_names_the_variable(
     # The override is authoritative, so pointing it at an absent file keeps the
     # developer's real repository .env out of this test.
     monkeypatch.setenv(env_file.ENV_OVERRIDE, str(tmp_path / "absent.env"))
+    monkeypatch.setattr(exa_search.orquestra_vault, "search", lambda *_args: None)
     with pytest.raises(exa_search.SearchError) as caught:
         exa_search.run_search("exa highlights")
     assert exa_search.ENV_VAR in str(caught.value)
     assert caught.value.status is None
+
+
+def test_enabled_orquestra_vault_search_precedes_environment_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        exa_search.orquestra_vault,
+        "search",
+        lambda *_args: {
+            "results": [
+                {
+                    "title": "Vault result",
+                    "url": "https://exa.ai/vault",
+                    "publishedDate": "2026-11-05",
+                    "highlights": ["From Orquestra vault"],
+                }
+            ]
+        },
+    )
+
+    report = exa_search.run_search("vault first")
+
+    assert report["results"][0]["title"] == "Vault result"
+    assert report["results"][0]["published_date"] == "2026-11-05"
 
 
 def test_key_comes_from_a_local_env_file_without_an_export(

@@ -29,14 +29,15 @@ The `integration` test is excluded from the default run: it spawns the server,
 performs the MCP handshake, calls `web_search` against Exa and skips itself when
 no key resolves or the network is unreachable.
 
-MCP client entry: `{"command": "web-search", "args": [], "env": {"EXA_API_KEY": "..."}}`
-(or `python3 -m web_search.server` when the script is not on `PATH`).
+MCP client entry: `{"command": "web-search", "args": []}` (or
+`python3 -m web_search.server` when the script is not on `PATH`).
 
-The key is read from the server's environment first, and when that is empty the
-server loads it by itself: the nearest `.env` above the installed package (the
-repository root here), otherwise the nearest `.env` above the working
-directory. `WEB_SEARCH_ENV_FILE=/path/to/file` overrides both, so a client that
-passes no `env` block still works without any manual export. Only
-`EXA_API_KEY` is copied and it never overwrites an exported value. The empty
-placeholder lives in [`.env.example`](.env.example); local `.env` files are
-gitignored.
+When OrquestraAI is installed, the server first searches the enabled Exa-preset
+credential in its vault and sends the query through Orquestra's blind HTTP
+proxy; the raw key never enters the MCP process. If the vault CLI or an enabled
+Exa credential is unavailable, it falls back to `EXA_API_KEY` from the server
+environment, then from the nearest `.env` above the installed package or
+working directory. `WEB_SEARCH_ENV_FILE=/path/to/file` overrides the `.env`
+lookup. Only `EXA_API_KEY` is copied from a file and an exported value always
+wins. The empty placeholder lives in [`.env.example`](.env.example); local
+`.env` files are gitignored.
