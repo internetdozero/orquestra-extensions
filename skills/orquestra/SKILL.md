@@ -37,14 +37,28 @@ All configurations, skills, and presets are centrally managed under `~/.orquestr
 
 When shell interaction is required or MCP tools are unavailable, use the native `orquestra` CLI binary. Always prefix commands with `rtk` to condense terminal output:
 
+### Bridge & Fleet Status
 - `rtk orquestra --bridge-status`: Inspect harness projection link status and fleet health as JSON.
 - `rtk orquestra --bridge-deploy`: Back up and link every installed harness into the fleet projection (JSON report).
-- `rtk orquestra --mcp-status`: Print the master MCP catalog and enabled states as JSON.
-- `rtk orquestra --mcp-deploy`: Compile active MCPs from `mcps.json` into all harness configuration files.
-- `rtk orquestra --mcp-set <id> <scope> <on|off>`: Toggle individual MCP servers (`scope`: `global` or a specific harness like `antigravity`, `state`: `on` or `off`).
 - `rtk orquestra --preset <id>`: Apply a mission preset (e.g., `rtk orquestra --preset full-power` or a custom id from `presets.json`).
+
+### Granular MCP Management (`orquestra mcp`)
+- `rtk orquestra mcp list [--format table|json|wide]`: Inspect MCP catalog with global and per-harness activation.
+- `rtk orquestra mcp status [--json]`: Fleet-wide MCP metrics, server counts, and harness sync breakdown.
+- `rtk orquestra mcp inspect <id> [--reveal] [--json]`: Server configuration, command, args, environment, and headers.
+- `rtk orquestra mcp add <id> --command <cmd> [--desc <text>]`: Register a new MCP server.
+- `rtk orquestra mcp remove <id> [--yes]`: Unregister an MCP server from catalog.
+- `rtk orquestra mcp enable <id> [--scope <harness>]`: Enable an MCP server globally or for a specific harness.
+- `rtk orquestra mcp disable <id> [--scope <harness>]`: Disable an MCP server globally or for a specific harness.
+- `rtk orquestra mcp deploy [--json]`: Recompile active MCP servers into all harness configuration files.
+- `rtk orquestra mcp targets [--json]`: List recognized agent harnesses, installation status, and config paths.
+- `rtk orquestra mcp test-connection <id> [--timeout <ms>]`: Protocol handshake and roundtrip latency check.
+- `rtk orquestra mcp tools-list <id> [--timeout <ms>]`: Introspect tools and parameter schemas on a server.
+- `rtk orquestra mcp call-tool <id> <tool> [--args '<json>'] [--timeout <ms>]`: Dynamic on-demand tool execution.
+
+### Blind Vault Operations (`orquestra vault`)
 - `rtk orquestra vault list`: List credential services with health and masked keys (zero secrets).
-- `rtk orquestra vault http --service <id> --endpoint <url> [--method GET]`: Blind HTTP request with the stored credential injected by the binary.
+- `rtk orquestra vault http --service <id> --endpoint <url> [--method GET]`: Blind HTTP request with stored credential.
 - `rtk orquestra vault exec <service> [--] <argv…>`: Run a command with stored credentials injected in memory; output is scrubbed.
 
 ## 3. MCP Control Plane (`orquestra-core`)
@@ -58,11 +72,20 @@ When the `orquestra-core` MCP server is active, prefer calling typed tools over 
 - `orquestra_create_skill(skill_id, name, description, instructions_markdown, scripts=None)`: Author a new skill in `skills-library/<id>/SKILL.md` with optional helper scripts.
 - `orquestra_delete_skill(skill_id)`: Safe-archive a skill: unlinks from all scopes and moves the vault folder to `backups/deleted-skills-<stamp>/`.
 
-### MCP Catalog Management
-- `orquestra_list_mcps()`: Read registered MCP servers with their global and per-harness activation state from `mcps.json`.
-- `orquestra_toggle_mcp(mcp_id, scope="global", enabled=True)`: Toggle an MCP server and recompile harness configs via the native deploy pipeline.
-- `orquestra_create_mcp(mcp_id, name, description, command, args=None, env=None, global_enabled=True)`: Register a new server in `mcps.json` and deploy it outward.
-- `orquestra_delete_mcp(mcp_id)`: Back up the catalog, remove the server definition, and redeploy harness configs.
+### MCP Catalog & Granular Operations
+- `orquestra_list_mcps()`: Read registered MCP servers with global and per-harness activation state.
+- `orquestra_toggle_mcp(mcp_id, scope="global", enabled=True)`: Toggle an MCP server and recompile harness configs.
+- `orquestra_mcp_status()`: Return fleet-wide MCP server counts, active states, and harness sync breakdown.
+- `orquestra_inspect_mcp(mcp_id, reveal=False)`: Inspect full server configuration, environment variables, and scopes.
+- `orquestra_test_mcp_connection(mcp_id, timeout_ms=5000)`: Test connection, verify transport, and check protocol latency.
+- `orquestra_list_mcp_tools(mcp_id, timeout_ms=5000)`: Introspect exposed tool definitions and schemas on demand.
+- `orquestra_call_mcp_tool(mcp_id, tool_name, arguments=None, timeout_ms=15000)`: Execute a tool dynamically without mounting it.
+- `orquestra_list_harness_targets()`: List all supported AI agent harness targets and config file paths.
+- `orquestra_create_mcp(mcp_id, name, description, command, args=None, env=None, global_enabled=True)`: Register a new server.
+- `orquestra_delete_mcp(mcp_id)`: Back up catalog, remove server, and redeploy harness configs.
+
+#### Dynamic Tool Execution Pattern
+To keep system prompts and token footprints small, agents can leave heavy or rarely-used MCP servers unmounted in harness configs. When a specific tool is required, query its schema via `orquestra_list_mcp_tools(mcp_id)` and execute it directly via `orquestra_call_mcp_tool(mcp_id, tool_name, arguments)`. This provides full capability with zero context bloat.
 
 ### Fleet & Instructions
 - `orquestra_fleet_status()`: Report harness bridge links, sync states, and projection health.

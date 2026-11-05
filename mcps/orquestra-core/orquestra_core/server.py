@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from mcp.server.mcpserver import MCPServer
 
-from . import catalog, catalog_admin, fleet, instructions, paths, presets, skill_admin, skills, vault
+from . import catalog, catalog_admin, fleet, instructions, mcp_control, paths, presets, skill_admin, skills, vault
 from .errors import actionable
 from .schema import HttpMethod
 
@@ -20,6 +20,12 @@ harnesses read (a global change fans out to every harness scope).
 
 MCP servers: orquestra_list_mcps reads the catalog, orquestra_toggle_mcp flips
 one server and recompiles every harness config through the native binary.
+Granular MCP management: orquestra_mcp_status summarizes catalog and targets sync,
+orquestra_inspect_mcp inspects detailed server config and environment,
+orquestra_test_mcp_connection validates transport and protocol handshake,
+orquestra_list_mcp_tools introspects tool schemas dynamically,
+orquestra_call_mcp_tool dynamically executes a tool over stdio transport, and
+orquestra_list_harness_targets lists supported AI agent targets and configs.
 
 Lifecycle: orquestra_create_skill / orquestra_delete_skill manage the vault,
 orquestra_create_mcp / orquestra_delete_mcp register or retire a server and
@@ -97,6 +103,59 @@ def orquestra_toggle_mcp(
 ) -> dict[str, Any]:
     """scope: 'global' or a harness id. Returns the config files that changed."""
     return catalog.toggle_mcp(mcp_id, scope, enabled)
+
+
+@tool(
+    description="Get fleet-wide MCP catalog status, total servers, and per-harness projection summary."
+)
+def orquestra_mcp_status() -> dict[str, Any]:
+    """Returns counts of official/custom servers, active states, and target sync status."""
+    return mcp_control.get_mcp_status()
+
+
+@tool(
+    description="Inspect full configuration, environment variables, headers, and projection of an MCP server."
+)
+def orquestra_inspect_mcp(mcp_id: str, reveal: bool = False) -> dict[str, Any]:
+    """mcp_id: Server identifier (e.g. 'cloudflare'). reveal: whether to reveal raw environment values."""
+    return mcp_control.inspect_mcp(mcp_id, reveal=reveal)
+
+
+@tool(
+    description="Test connection and protocol handshake for an MCP server (measures latency and handshake health)."
+)
+def orquestra_test_mcp_connection(mcp_id: str, timeout_ms: int = 5000) -> dict[str, Any]:
+    """mcp_id: Server identifier. timeout_ms: Handshake timeout in milliseconds."""
+    return mcp_control.test_mcp_connection(mcp_id, timeout_ms=timeout_ms)
+
+
+@tool(
+    description="List all available tools and schema definitions exposed by an MCP server without mounting it."
+)
+def orquestra_list_mcp_tools(mcp_id: str, timeout_ms: int = 5000) -> dict[str, Any]:
+    """mcp_id: Server identifier. Returns list of tools with their descriptions and parameters."""
+    return mcp_control.list_mcp_tools(mcp_id, timeout_ms=timeout_ms)
+
+
+@tool(
+    description="Dynamically execute a tool on an MCP server over stdio transport without mounting it into session context."
+)
+def orquestra_call_mcp_tool(
+    mcp_id: str,
+    tool_name: str,
+    arguments: dict[str, Any] | None = None,
+    timeout_ms: int = 15000,
+) -> dict[str, Any]:
+    """Execute on-demand tool calls against any catalog server cleanly."""
+    return mcp_control.call_mcp_tool(mcp_id, tool_name, arguments=arguments, timeout_ms=timeout_ms)
+
+
+@tool(
+    description="List all supported AI agent harness targets (Claude, Codex, OpenCode, Cursor) and sync status."
+)
+def orquestra_list_harness_targets() -> list[dict[str, Any]]:
+    """Returns harness targets with their install and config paths."""
+    return mcp_control.list_harness_targets()
 
 
 @tool(description="Return the master ~/.orquestra/AGENTS.md that every harness inherits.")

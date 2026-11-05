@@ -47,6 +47,71 @@ def mcp_set(mcp_id: str, scope: str, enabled: bool) -> dict[str, Any]:
     return _json(run("--mcp-set", mcp_id, scope, state), f"--mcp-set {mcp_id} {scope} {state}")
 
 
+def mcp_status() -> dict[str, Any]:
+    """Status summary of all MCP servers and harness targets."""
+    report = _json(run("mcp", "status", "--json"), "mcp status")
+    if not isinstance(report, dict):
+        raise BridgeError("mcp status did not return a status object")
+    return report
+
+
+def mcp_inspect(mcp_id: str, reveal: bool = False) -> dict[str, Any]:
+    """Detailed inspection of an MCP server registration."""
+    argv = ["mcp", "inspect", mcp_id, "--json"]
+    if reveal:
+        argv.append("--reveal")
+    report = _json(run(*argv), f"mcp inspect {mcp_id}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"mcp inspect {mcp_id} did not return an object")
+    return report
+
+
+def mcp_test_connection(mcp_id: str, timeout_ms: int = 5000) -> dict[str, Any]:
+    """Test connection and protocol handshake for an MCP server."""
+    report = _json(
+        run("mcp", "test-connection", mcp_id, "--timeout", str(timeout_ms), "--json"),
+        f"mcp test-connection {mcp_id}",
+    )
+    if not isinstance(report, dict):
+        raise BridgeError(f"mcp test-connection {mcp_id} did not return a report object")
+    return report
+
+
+def mcp_tools_list(mcp_id: str, timeout_ms: int = 5000) -> dict[str, Any]:
+    """List available tools exposed by an MCP server."""
+    report = _json(
+        run("mcp", "tools-list", mcp_id, "--timeout", str(timeout_ms), "--json"),
+        f"mcp tools-list {mcp_id}",
+    )
+    if not isinstance(report, dict):
+        raise BridgeError(f"mcp tools-list {mcp_id} did not return a tools list object")
+    return report
+
+
+def mcp_call_tool(
+    mcp_id: str,
+    tool_name: str,
+    args: dict[str, Any] | None = None,
+    timeout_ms: int = 15000,
+) -> dict[str, Any]:
+    """Dynamically invoke a tool on an MCP server over stdio transport."""
+    argv = ["mcp", "call-tool", mcp_id, tool_name, "--timeout", str(timeout_ms), "--json"]
+    if args is not None:
+        argv.extend(["--args", json.dumps(args)])
+    report = _json(run(*argv), f"mcp call-tool {mcp_id} {tool_name}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"mcp call-tool {mcp_id} {tool_name} did not return a result object")
+    return report
+
+
+def mcp_targets() -> list[dict[str, Any]]:
+    """List all supported AI agent harness targets and their sync status."""
+    report = _json(run("mcp", "targets", "--json"), "mcp targets")
+    if not isinstance(report, list):
+        raise BridgeError("mcp targets did not return a list")
+    return report
+
+
 def mcp_deploy() -> dict[str, Any]:
     """Recompile the catalog into every installed harness config."""
     return _json(run("--mcp-deploy"), "--mcp-deploy")
