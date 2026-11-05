@@ -11,6 +11,12 @@ from builders import make_codex, make_freebuff_desktop
 from session_relay.server import server
 
 TOOLS = [
+    "export_session",
+    "estimate_purge",
+    "purge_sessions",
+    "delete_session",
+    "get_retention_policy",
+    "set_retention_policy",
     "list_recent_sessions",
     "pin_session",
     "unpin_session",

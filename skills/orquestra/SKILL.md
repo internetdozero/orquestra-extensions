@@ -69,6 +69,16 @@ When shell interaction is required or MCP tools are unavailable, use the native 
 - `rtk orquestra vault http --service <id> --endpoint <url> [--method GET] [--key-number <N>] [--key-tag <tag>]`: Blind HTTP request.
 - `rtk orquestra vault exec <service> [--key-number <N>] [--] <argv…>`: Run a command with stored credentials injected in memory; output is scrubbed.
 
+### Sessions Management (`orquestra sessions`)
+- `rtk orquestra sessions list [--harness <h>] [--limit <N>] [--compact]`: Discover sessions across harnesses.
+- `rtk orquestra sessions inspect <harness> <id> [--turns <N>]`: Load ordered conversation turns and tool events.
+- `rtk orquestra sessions export <harness> <id> [--format md|json] [--output <path>]`: Full transcript export.
+- `rtk orquestra sessions pin <harness> <id> [--label <text>]` / `unpin`: Manage retention exemptions.
+- `rtk orquestra sessions purge [--older-than <days>] [--dry-run]`: Safe retention cleanup skipping active/pinned sessions.
+- `rtk orquestra sessions delete <harness> <id> [--force]`: Surgical deletion enforcing safety guards.
+- `rtk orquestra sessions policy [--get|--set ...]`: Query or update TTLs and auto-purge settings.
+- `rtk orquestra sessions watch [--harness <h>]`: Real-time tracking of active turns and touched files.
+
 ## 3. MCP Control Plane (`orquestra-core`)
 
 When the `orquestra-core` MCP server is active, prefer calling typed tools over invoking the shell CLI:
@@ -116,6 +126,20 @@ To keep system prompts and token footprints small, agents can leave heavy or rar
 - `orquestra_list_presets()`: Built-in `full-power` plus custom profiles from `~/.orquestra/presets.json`.
 - `orquestra_apply_preset(preset_id)`: Activate a preset across all harnesses.
 - `orquestra_save_preset(name, ...)` / `orquestra_delete_preset(preset_id)`: Manage custom presets (built-ins are protected).
+
+### Session Observability, Relay & Retention (`orquestra-session-relay`)
+- `list_recent_sessions(harness=None, limit=5, compact=False)`: Discover sessions across all 9 harnesses with pin and alive status.
+- `inspect_session(harness=None, session_id="latest", max_turns=10)`: Inspect conversation turns, tool calls, and error states.
+- `search_sessions_history(query, harness=None, limit=10, project_path=None, search_content=True)`: Search across full transcripts or metadata.
+- `handoff_context(source_harness=None, target_harness=None, session_id="latest")`: Synthesize structured Goal/Files/State/Blocker/Next brief.
+- `export_session(harness, session_id="latest", format="markdown", output_path=None)`: Export unabridged transcripts to Markdown or JSON.
+- `pin_session(harness, session_id, label=None)` / `unpin_session` / `list_pinned_sessions`: Manage retention exemptions in `sessions_policy.json`.
+- `estimate_purge(older_than_days=None, harness=None, session_ids=None)`: Dry-run estimation of purgeable candidates and bytes.
+- `purge_sessions(older_than_days=None, harness=None, session_ids=None, dry_run=True)`: Safe batch purge protecting pinned and active sessions.
+- `delete_session(harness, session_id, force=False)`: Surgical session deletion enforcing safety guards.
+- `get_retention_policy()` / `set_retention_policy(...)`: Configure retention TTLs, intervals, and per-harness overrides.
+- `watch_active_agent(harness=None)`: Live inspection of active running turn, current tool, and touched files.
+- `tail_agent_activity(harness=None, lines=15)` / `audit_agent(harness, session_id=None)`: Streamable telemetry and lightweight audits.
 
 ## 4. Mission Presets
 

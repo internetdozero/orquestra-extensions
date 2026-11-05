@@ -181,6 +181,60 @@ def decorate(sessions: list, home: Path | None = None) -> list:
     return decorated
 
 
+def get_retention_policy(home: Path | None = None) -> dict[str, Any]:
+    """Read the retention configuration block from sessions_policy.json."""
+    doc = _read_doc(home)
+    retention = doc.get("retention")
+    if not isinstance(retention, dict):
+        retention = {
+            "defaultTtlDays": 30,
+            "autoPurgeEnabled": False,
+            "intervalHours": 24,
+            "harnessOverrides": {},
+        }
+    return {
+        "defaultTtlDays": retention.get("defaultTtlDays", 30),
+        "autoPurgeEnabled": bool(retention.get("autoPurgeEnabled", False)),
+        "intervalHours": retention.get("intervalHours", 24),
+        "harnessOverrides": dict(retention.get("harnessOverrides", {})),
+    }
+
+
+def set_retention_policy(
+    default_ttl_days: int | None = None,
+    auto_purge_enabled: bool | None = None,
+    interval_hours: int | None = None,
+    harness_overrides: dict[str, int] | None = None,
+    home: Path | None = None,
+) -> dict[str, Any]:
+    """Update retention policy settings in sessions_policy.json atomically."""
+    doc = _read_doc(home)
+    retention = dict(doc.get("retention") or {})
+    if default_ttl_days is not None:
+        if default_ttl_days <= 0:
+            raise ValueError("default_ttl_days must be positive")
+        retention["defaultTtlDays"] = int(default_ttl_days)
+    if auto_purge_enabled is not None:
+        retention["autoPurgeEnabled"] = bool(auto_purge_enabled)
+    if interval_hours is not None:
+        if interval_hours <= 0:
+            raise ValueError("interval_hours must be positive")
+        retention["intervalHours"] = int(interval_hours)
+    if harness_overrides is not None:
+        if not isinstance(harness_overrides, dict):
+            raise ValueError("harness_overrides must be a dictionary")
+        overrides = {}
+        for k, v in harness_overrides.items():
+            if int(v) <= 0:
+                raise ValueError(f"TTL override for '{k}' must be positive")
+            overrides[canonical_harness(k)] = int(v)
+        retention["harnessOverrides"] = overrides
+
+    doc["retention"] = retention
+    _write_doc(doc, home)
+    return get_retention_policy(home)
+
+
 __all__ = [
     "decorate",
     "get_pins",
@@ -188,4 +242,6 @@ __all__ = [
     "pin_session",
     "policy_path",
     "unpin_session",
+    "get_retention_policy",
+    "set_retention_policy",
 ]

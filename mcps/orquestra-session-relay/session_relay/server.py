@@ -14,25 +14,9 @@ from .adapters.base import clamp_limit
 from .compact import compact_row, compact_session
 from .errors import actionable
 from .lookup import resolve
+from .meta import INSTRUCTIONS
+from .retention_tools import register_retention_tools
 from .schema import Harness
-
-INSTRUCTIONS = """Read-only session relay for AI coding harnesses on this machine.
-
-Use list_recent_sessions to see what Codex, Claude Code, Antigravity, OpenCode,
-Kilo, Copilot, Hermes and Freebuff were doing, inspect_session for the ordered
-conversation and tool events, search_sessions_history to find earlier work by
-keyword, handoff_context to produce a Goal / Files / State / Blocker /
-Next-steps brief, pin_session / unpin_session / list_pinned_sessions to protect
-sessions in ~/.orquestra/sessions_policy.json, watch_active_agent to track live
-agent state and touched files in real time, and tail_agent_activity to tail
-concise summaries of the latest events.
-
-Every harness parameter publishes its accepted ids in the tool schema (canonical
-ids plus aliases such as claude-code, gemini and xai); a rejected id comes back
-as a tool error listing them, not as a generic execution failure.
-
-Every store is opened read-only. Missing harnesses return friendly empty states.
-"""
 
 server = MCPServer(
     name="session-relay",
@@ -40,6 +24,8 @@ server = MCPServer(
     version="0.1.0",
     instructions=INSTRUCTIONS,
 )
+
+register_retention_tools(server)
 
 
 @server.tool(
@@ -144,11 +130,17 @@ def handoff_context(source_harness: Harness, session_id: str = "latest") -> str:
 )
 @actionable
 def search_sessions_history(
-    query: str, harness: Harness | None = None, limit: int = 10
+    query: str,
+    harness: Harness | None = None,
+    limit: int = 10,
+    project_path: str | None = None,
+    search_content: bool = True,
 ) -> dict[str, Any]:
-    """Find prior work by case-insensitive substring across session texts."""
+    """Find prior work by case-insensitive substring across session texts or metadata."""
     if not query.strip():
         raise ToolError("query must not be empty")
+    clean_query = query.strip().lower()
+    clean_project = (project_path or "").strip().lower() if project_path else None
     adapters = discovery.adapters_for(harness)
     hits = []
     warnings: list[str] = []
@@ -157,7 +149,34 @@ def search_sessions_history(
             warnings.append(f"{adapter.id}: no session store found")
             continue
         try:
-            hits.extend(adapter.search(query, clamp_limit(limit, 10, 50)))
+            if search_content:
+                adapter_hits = adapter.search(query, clamp_limit(limit, 10, 50))
+            else:
+                adapter_hits = []
+                from .models import SearchHit
+
+                for s in adapter.list_sessions(limit=50):
+                    if (
+                        clean_query in s.title.lower()
+                        or clean_query in s.session_id.lower()
+                    ):
+                        adapter_hits.append(
+                            SearchHit(
+                                harness=adapter.id,
+                                session_id=s.session_id,
+                                title=s.title,
+                                snippet=f"Title match: {s.title}",
+                                updated_at=s.updated_at,
+                            )
+                        )
+            if clean_project:
+                adapter_hits = [
+                    h
+                    for h in adapter_hits
+                    if not getattr(h, "project", None)
+                    or clean_project in str(getattr(h, "project")).lower()
+                ]
+            hits.extend(adapter_hits)
         except Exception as error:  # a broken store must not hide the others
             warnings.append(f"{adapter.id}: {type(error).__name__}: {error}")
     hits.sort(key=lambda hit: hit.updated_at or "", reverse=True)

@@ -46,6 +46,10 @@ class SessionAdapter(ABC):
     def search(self, query: str, limit: int = 10) -> list[SearchHit]:
         """Case-insensitive message search across this harness's sessions."""
 
+    def delete_session(self, session_id: str) -> int:
+        """Delete session storage from disk. Returns reclaimed bytes."""
+        return 0
+
 
 def limit_turns(events: list[Event], max_turns: int) -> list[Event]:
     """Keep the most recent `max_turns` user turns with their tool activity."""
