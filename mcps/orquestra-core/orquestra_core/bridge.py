@@ -200,3 +200,82 @@ def vault_set_enabled(service: str, enabled: bool) -> dict[str, Any]:
     if not isinstance(report, dict):
         raise BridgeError("vault set-enabled did not return a service object")
     return report
+
+
+def vault_inspect(service: str) -> dict[str, Any]:
+    """Inspect credential service details, masked keys, health, and tags."""
+    report = _json(run("vault", "inspect", service, "--json"), f"vault inspect {service}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"vault inspect {service} did not return an object")
+    return report
+
+
+def vault_rotate(
+    service: str, next_key: bool = True, key_number: int | None = None
+) -> dict[str, Any]:
+    """Advance the active key pointer or rotate a specific key in the pool."""
+    argv = ["vault", "rotate", service, "--json"]
+    if next_key:
+        argv.append("--next")
+    if key_number is not None:
+        argv.extend(["--key-number", str(key_number)])
+    report = _json(run(*argv), f"vault rotate {service}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"vault rotate {service} did not return an object")
+    return report
+
+
+def vault_test(service: str, key_number: int | None = None) -> dict[str, Any]:
+    """Ping provider verify endpoint, measure latency, and persist observed health."""
+    argv = ["vault", "test", service, "--json"]
+    if key_number is not None:
+        argv.extend(["--key-number", str(key_number)])
+    report = _json(run(*argv), f"vault test {service}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"vault test {service} did not return a test result object")
+    return report
+
+
+def vault_presets() -> list[dict[str, Any]]:
+    """List built-in provider presets with headers, env vars, and metadata fields."""
+    report = _json(run("vault", "presets", "--json"), "vault presets")
+    if not isinstance(report, list):
+        raise BridgeError("vault presets did not return a list")
+    return report
+
+
+def vault_audit() -> dict[str, Any]:
+    """Diagnostic check of storage encryption, 0600 file permissions, and backups."""
+    report = _json(run("vault", "audit", "--json"), "vault audit")
+    if not isinstance(report, dict):
+        raise BridgeError("vault audit did not return an audit report")
+    return report
+
+
+def vault_add_key(service: str, key: str, tag: str | None = None) -> dict[str, Any]:
+    """Push a new key to an existing service pool."""
+    argv = ["vault", "add-key", service, "--key", key, "--json"]
+    if tag is not None:
+        argv.extend(["--tag", tag])
+    report = _json(run(*argv), f"vault add-key {service}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"vault add-key {service} did not return a service object")
+    return report
+
+
+def vault_remove_key(service: str, key_number: int) -> dict[str, Any]:
+    """Remove a key from the pool by 1-based key number."""
+    argv = ["vault", "remove-key", service, "--key-number", str(key_number), "--json"]
+    report = _json(run(*argv), f"vault remove-key {service}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"vault remove-key {service} did not return a service object")
+    return report
+
+
+def vault_set_primary(service: str, key_number: int) -> dict[str, Any]:
+    """Set the primary active key by 1-based key number."""
+    argv = ["vault", "set-primary", service, "--key-number", str(key_number), "--json"]
+    report = _json(run(*argv), f"vault set-primary {service}")
+    if not isinstance(report, dict):
+        raise BridgeError(f"vault set-primary {service} did not return a service object")
+    return report

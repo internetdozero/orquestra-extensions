@@ -48,6 +48,7 @@ def execute_http(
     body: Any | None = None,
     timeout: float = 30.0,
     key_number: int | None = None,
+    key_tag: str | None = None,
 ) -> dict[str, Any]:
     """Blind HTTP request; the stored credential is injected by the binary.
 
@@ -67,6 +68,7 @@ def execute_http(
     if timeout <= 0:
         raise VaultRequestError("timeout must be positive")
     _validate_key_number(key_number)
+    clean_tag = key_tag.strip() if key_tag else None
 
     headers_json = json.dumps(headers) if headers else None
     if body is None:
@@ -80,7 +82,7 @@ def execute_http(
             raise VaultRequestError(f"body is not JSON-serializable: {error}") from error
     try:
         result = bridge.vault_http(
-            name, target, verb, headers_json, body_str, key_number=key_number
+            name, target, verb, headers_json, body_str, key_tag=clean_tag, key_number=key_number
         )
         return _include_used_key_number(result)
     except BridgeError as error:
@@ -138,5 +140,109 @@ def set_service_enabled(service_id: str, enabled: bool) -> dict[str, Any]:
         raise VaultRequestError("enabled must be true or false")
     try:
         return bridge.vault_set_enabled(name, enabled)
+    except BridgeError as error:
+        raise _refusal(error, name) from error
+
+
+def inspect_service(service_id: str) -> dict[str, Any]:
+    """Inspect service metadata, pool health, and masked keys. Never passes --reveal."""
+    name = (service_id or "").strip()
+    if not name:
+        raise VaultRequestError("service_id must not be empty")
+    try:
+        service = bridge.vault_inspect(name)
+        active_index = service.get("activeKeyIndex")
+        if isinstance(active_index, int) and not isinstance(active_index, bool):
+            service["activeKeyNumber"] = active_index + 1
+        return service
+    except BridgeError as error:
+        raise _refusal(error, name) from error
+
+
+def rotate_key(
+    service_id: str, next_key: bool = True, key_number: int | None = None
+) -> dict[str, Any]:
+    """Advance key pointer or rotate specific key in the pool."""
+    name = (service_id or "").strip()
+    if not name:
+        raise VaultRequestError("service_id must not be empty")
+    _validate_key_number(key_number)
+    try:
+        service = bridge.vault_rotate(name, next_key=next_key, key_number=key_number)
+        active_index = service.get("activeKeyIndex")
+        if isinstance(active_index, int) and not isinstance(active_index, bool):
+            service["activeKeyNumber"] = active_index + 1
+        return service
+    except BridgeError as error:
+        raise _refusal(error, name) from error
+
+
+def test_service(service_id: str, key_number: int | None = None) -> dict[str, Any]:
+    """Test connection and measure latency to the provider verify endpoint."""
+    name = (service_id or "").strip()
+    if not name:
+        raise VaultRequestError("service_id must not be empty")
+    _validate_key_number(key_number)
+    try:
+        return bridge.vault_test(name, key_number=key_number)
+    except BridgeError as error:
+        raise _refusal(error, name) from error
+
+
+def list_vault_presets() -> list[dict[str, Any]]:
+    """List provider presets available for blind vault configuration."""
+    try:
+        return bridge.vault_presets()
+    except BridgeError as error:
+        raise VaultRequestError(f"vault presets failed: {error}") from error
+
+
+def audit_vault() -> dict[str, Any]:
+    """Run audit checks on vault encryption and permission integrity."""
+    try:
+        return bridge.vault_audit()
+    except BridgeError as error:
+        raise VaultRequestError(f"vault audit failed: {error}") from error
+
+
+def add_key_to_pool(service_id: str, key: str, tag: str | None = None) -> dict[str, Any]:
+    """Add a credential to a service key pool with optional tag."""
+    name = (service_id or "").strip()
+    if not name:
+        raise VaultRequestError("service_id must not be empty")
+    clean_key = (key or "").strip()
+    if not clean_key:
+        raise VaultRequestError("key must not be empty")
+    clean_tag = tag.strip() if tag else None
+    try:
+        return bridge.vault_add_key(name, clean_key, tag=clean_tag)
+    except BridgeError as error:
+        raise _refusal(error, name) from error
+
+
+def remove_key_from_pool(service_id: str, key_number: int) -> dict[str, Any]:
+    """Remove a key from the pool by 1-based number."""
+    name = (service_id or "").strip()
+    if not name:
+        raise VaultRequestError("service_id must not be empty")
+    _validate_key_number(key_number)
+    if key_number is None:
+        raise VaultRequestError("key_number must be specified")
+    try:
+        return bridge.vault_remove_key(name, key_number)
+    except BridgeError as error:
+        raise _refusal(error, name) from error
+
+
+def set_primary_key(service_id: str, key_number: int) -> dict[str, Any]:
+    """Set the primary active key by 1-based number."""
+    name = (service_id or "").strip()
+    if not name:
+        raise VaultRequestError("service_id must not be empty")
+    _validate_key_number(key_number)
+    if key_number is None:
+        raise VaultRequestError("key_number must be specified")
+    try:
+        return bridge.vault_set_primary(name, key_number)
     except BridgeError as error:
         raise _refusal(error, name) from error

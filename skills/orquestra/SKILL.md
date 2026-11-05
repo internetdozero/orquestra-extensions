@@ -57,9 +57,17 @@ When shell interaction is required or MCP tools are unavailable, use the native 
 - `rtk orquestra mcp call-tool <id> <tool> [--args '<json>'] [--timeout <ms>]`: Dynamic on-demand tool execution.
 
 ### Blind Vault Operations (`orquestra vault`)
-- `rtk orquestra vault list`: List credential services with health and masked keys (zero secrets).
-- `rtk orquestra vault http --service <id> --endpoint <url> [--method GET]`: Blind HTTP request with stored credential.
-- `rtk orquestra vault exec <service> [--] <argv…>`: Run a command with stored credentials injected in memory; output is scrubbed.
+- `rtk orquestra vault list [--preset <name>] [--enabled-only] [--search <term>]`: List credential services with health and masked keys.
+- `rtk orquestra vault inspect <id> [--reveal] [--key-number <N>]`: Service details, masked keys, health, and tags.
+- `rtk orquestra vault add-key <id> --key <secret> [--tag <tag>]`: Push a new key to an existing service pool.
+- `rtk orquestra vault remove-key <id> --key-number <N>`: Remove key from pool by 1-based number.
+- `rtk orquestra vault set-primary <id> --key-number <N>`: Set primary active key in pool.
+- `rtk orquestra vault rotate <id> [--next] [--key-number <N>]`: Advance active key pointer or rotate specific key.
+- `rtk orquestra vault test <id> [--key-number <N>]`: Ping provider verify endpoint and measure roundtrip latency.
+- `rtk orquestra vault presets [--json]`: Discover provider credential presets (headers, env vars, metadata).
+- `rtk orquestra vault audit [--json]`: Check at-rest encryption, 0600 file permissions, and backups.
+- `rtk orquestra vault http --service <id> --endpoint <url> [--method GET] [--key-number <N>] [--key-tag <tag>]`: Blind HTTP request.
+- `rtk orquestra vault exec <service> [--key-number <N>] [--] <argv…>`: Run a command with stored credentials injected in memory; output is scrubbed.
 
 ## 3. MCP Control Plane (`orquestra-core`)
 
@@ -94,8 +102,13 @@ To keep system prompts and token footprints small, agents can leave heavy or rar
 
 ### Credentials (blind vault)
 - `orquestra_vault_list()`: List credential services with health, kill-switch state and masked keys. No secrets are ever returned.
-- `orquestra_vault_http(service_id, endpoint, method="GET", headers=None, body=None)`: Blind HTTP request; the binary injects the stored key and scrubs it from the response.
-- `orquestra_vault_exec(service_id, command)`: Run a CLI command with stored credentials injected in memory; output is scrubbed.
+- `orquestra_vault_inspect(service_id)`: Inspect complete metadata, pool health, and key tags.
+- `orquestra_vault_rotate(service_id, next_key=True, key_number=None)`: Rotate key pool or advance pointer.
+- `orquestra_vault_test(service_id, key_number=None)`: Ping provider verify endpoint, measure latency, and persist health.
+- `orquestra_vault_presets()`: Discover built-in provider presets (headers, env vars, metadata).
+- `orquestra_vault_audit()`: Audit security posture of local storage encryption and file permissions.
+- `orquestra_vault_http(service_id, endpoint, method="GET", headers=None, body=None, timeout=30.0, key_number=None, key_tag=None)`: Blind HTTP request; the binary injects stored key and scrubs response.
+- `orquestra_vault_exec(service_id, command, timeout=60.0, key_number=None)`: Run a CLI command with stored credentials injected in memory; output is scrubbed.
 - `orquestra_vault_set_enabled(service_id, enabled)`: Flip the service kill-switch; the blind proxy refuses disabled services.
 - Never ask the operator to paste a secret into chat: register it in the Vault and reference it by `service_id`.
 

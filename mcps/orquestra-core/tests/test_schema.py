@@ -29,7 +29,13 @@ def test_http_method_schema_publishes_the_enum() -> None:
 
 def test_vault_http_publishes_optional_one_based_key_number() -> None:
     schema = _schema("orquestra_vault_http")
-    assert schema["properties"]["key_number"]["type"] == "integer"
+    prop = schema["properties"]["key_number"]
+    type_names = (
+        [prop.get("type")]
+        if "type" in prop
+        else [b.get("type") for b in prop.get("anyOf", [])]
+    )
+    assert "integer" in type_names
     assert "key_number" not in schema.get("required", [])
 
 
@@ -171,3 +177,47 @@ def test_list_tools_still_succeed_after_the_guard(mock_home: Path) -> None:
     if isinstance(rows, dict):  # list results arrive wrapped in {"result": [...]}
         rows = rows["result"]
     assert {"full-power"} <= {row["id"] for row in rows}
+
+
+def test_granular_vault_tools_roundtrip(mock_home: Path) -> None:
+    # inspect
+    inspected = _call("orquestra_vault_inspect", service_id="svc-a")
+    assert inspected.is_error is False
+    assert inspected.structured_content["id"] == "svc-a"
+    assert inspected.structured_content["activeKeyNumber"] == 1
+    assert inspected.structured_content["tags"] == ["prod"]
+
+    # rotate
+    rotated = _call("orquestra_vault_rotate", service_id="svc-a", next_key=True, key_number=2)
+    assert rotated.is_error is False
+    assert rotated.structured_content["activeKeyNumber"] == 2
+
+    # test
+    tested = _call("orquestra_vault_test", service_id="svc-a", key_number=1)
+    assert tested.is_error is False
+    assert tested.structured_content["success"] is True
+    assert tested.structured_content["health"] == "healthy"
+
+    # presets
+    presets = _call("orquestra_vault_presets")
+    assert presets.is_error is False
+    rows = presets.structured_content
+    if isinstance(rows, dict) and "result" in rows:
+        rows = rows["result"]
+    assert any(p["id"] == "github" for p in rows)
+
+    # audit
+    audited = _call("orquestra_vault_audit")
+    assert audited.is_error is False
+    assert audited.structured_content["secure"] is True
+    assert audited.structured_content["encrypted"] is True
+
+    # http with key_tag
+    http = _call(
+        "orquestra_vault_http",
+        service_id="svc-a",
+        endpoint="https://api.example.com/ping",
+        key_tag="prod",
+    )
+    assert http.is_error is False
+    assert http.structured_content["status"] == 200

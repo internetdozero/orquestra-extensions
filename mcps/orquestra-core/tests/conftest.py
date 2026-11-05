@@ -92,7 +92,15 @@ elif args[:2] == ["vault", "list"]:
         "enabled": True, "totalKeys": 5, "maskedKeys": ["gh****"] * 5, \
         "health": "ok", "keyHealth": [], "activeKeyIndex": 0}]))
 elif args[:2] == ["vault", "http"]:
-    opts = dict(zip(args[2::2], args[3::2]))
+    opts = {}
+    i = 2
+    while i < len(args):
+        if args[i].startswith("--") and i + 1 < len(args) and not args[i+1].startswith("--"):
+            opts[args[i]] = args[i+1]
+            i += 2
+        else:
+            opts[args[i]] = True
+            i += 1
     service = opts.get("--service", "")
     if service != "svc-a":
         print(f"unknown vault service: {service}", file=sys.stderr)
@@ -121,6 +129,77 @@ elif args[:2] == ["vault", "set-enabled"]:
         print(f"expected on|off, got {state}", file=sys.stderr)
         sys.exit(2)
     print(json.dumps({"id": service, "label": "Service A", "enabled": state == "on"}))
+elif args[:2] == ["vault", "inspect"]:
+    service = args[2] if len(args) > 2 and not args[2].startswith("-") else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({
+        "id": "svc-a", "label": "Service A", "preset": "github",
+        "enabled": True, "totalKeys": 5, "maskedKeys": ["gh****"] * 5,
+        "health": "ok", "keyHealth": [], "activeKeyIndex": 0, "tags": ["prod"]
+    }))
+elif args[:2] == ["vault", "rotate"]:
+    service = args[2] if len(args) > 2 and not args[2].startswith("-") else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    key_num = int(args[args.index("--key-number") + 1]) if "--key-number" in args else 2
+    print(json.dumps({
+        "id": "svc-a", "label": "Service A", "preset": "github",
+        "enabled": True, "totalKeys": 5, "maskedKeys": ["gh****"] * 5,
+        "health": "ok", "keyHealth": [], "activeKeyIndex": key_num - 1
+    }))
+elif args[:2] == ["vault", "test"]:
+    service = args[2] if len(args) > 2 and not args[2].startswith("-") else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({
+        "success": True, "inconclusive": False, "latencyMs": 45,
+        "message": "Connection verified", "health": "healthy"
+    }))
+elif args[:2] == ["vault", "presets"]:
+    print(json.dumps([
+        {"id": "github", "label": "GitHub", "verifyUrl": "https://api.github.com/user"},
+        {"id": "openai", "label": "OpenAI", "verifyUrl": "https://api.openai.com/v1/models"}
+    ]))
+elif args[:2] == ["vault", "audit"]:
+    print(json.dumps({
+        "secure": True, "encrypted": True, "permissions": "0600",
+        "servicesCount": 1, "issues": []
+    }))
+elif args[:2] == ["vault", "add-key"]:
+    service = args[2] if len(args) > 2 and not args[2].startswith("-") else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({
+        "id": "svc-a", "label": "Service A", "preset": "github",
+        "enabled": True, "totalKeys": 6, "maskedKeys": ["gh****"] * 6,
+        "health": "ok", "keyHealth": [], "activeKeyIndex": 0
+    }))
+elif args[:2] == ["vault", "remove-key"]:
+    service = args[2] if len(args) > 2 and not args[2].startswith("-") else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    print(json.dumps({
+        "id": "svc-a", "label": "Service A", "preset": "github",
+        "enabled": True, "totalKeys": 4, "maskedKeys": ["gh****"] * 4,
+        "health": "ok", "keyHealth": [], "activeKeyIndex": 0
+    }))
+elif args[:2] == ["vault", "set-primary"]:
+    service = args[2] if len(args) > 2 and not args[2].startswith("-") else ""
+    if service != "svc-a":
+        print(f"unknown vault service: {service}", file=sys.stderr)
+        sys.exit(1)
+    key_num = int(args[args.index("--key-number") + 1]) if "--key-number" in args else 1
+    print(json.dumps({
+        "id": "svc-a", "label": "Service A", "preset": "github",
+        "enabled": True, "totalKeys": 5, "maskedKeys": ["gh****"] * 5,
+        "health": "ok", "keyHealth": [], "activeKeyIndex": key_num - 1
+    }))
 else:
     print(f"unsupported arguments: {args}", file=sys.stderr)
     sys.exit(2)

@@ -10,47 +10,8 @@ from mcp.server.mcpserver import MCPServer
 
 from . import catalog, catalog_admin, fleet, instructions, mcp_control, paths, presets, skill_admin, skills, vault
 from .errors import actionable
+from .meta import INSTRUCTIONS
 from .schema import HttpMethod
-
-INSTRUCTIONS = """Control plane for the OrquestraAI harness fleet on this machine.
-
-Skills: orquestra_list_skills shows the vault and which scopes project each
-skill, orquestra_enable_skill / orquestra_disable_skill flip the symlinks the
-harnesses read (a global change fans out to every harness scope).
-
-MCP servers: orquestra_list_mcps reads the catalog, orquestra_toggle_mcp flips
-one server and recompiles every harness config through the native binary.
-Granular MCP management: orquestra_mcp_status summarizes catalog and targets sync,
-orquestra_inspect_mcp inspects detailed server config and environment,
-orquestra_test_mcp_connection validates transport and protocol handshake,
-orquestra_list_mcp_tools introspects tool schemas dynamically,
-orquestra_call_mcp_tool dynamically executes a tool over stdio transport, and
-orquestra_list_harness_targets lists supported AI agent targets and configs.
-
-Lifecycle: orquestra_create_skill / orquestra_delete_skill manage the vault,
-orquestra_create_mcp / orquestra_delete_mcp register or retire a server and
-deploy the catalog.
-
-Instructions: orquestra_read_instructions returns the master AGENTS.md and
-orquestra_append_mission_rule appends a scoped directive with a backup.
-
-Vault: orquestra_vault_list shows credential services with masked keys,
-orquestra_vault_http / orquestra_vault_exec spend a stored key blind, and
-orquestra_vault_set_enabled flips the kill-switch the proxy enforces.
-Before a credentialed request, ask whether the operator prefers a specific
-key number or the active default when no preference is already stated. Reuse
-that choice for the task; never request or expose the secret itself.
-
-Fleet: orquestra_fleet_status reports the link state of every harness.
-orquestra_deploy_bridge runs headless bridge fusion: backs up and symlinks
-every installed harness into the fleet projection.
-
-Presets: orquestra_list_presets lists all built-in and custom mission presets;
-orquestra_apply_preset activates a named preset (full-power or a custom
-id) across all harnesses via the native binary;
-orquestra_save_preset creates or updates a custom preset in presets.json and
-orquestra_delete_preset removes one (built-ins are protected).
-"""
 
 server = MCPServer(
     name="orquestra-core",
@@ -306,9 +267,46 @@ def orquestra_vault_http(
     body: Any | None = None,
     timeout: float = 30.0,
     key_number: int | None = None,
+    key_tag: str | None = None,
 ) -> dict[str, Any]:
     """Returns status and scrubbed response; reports the one-based key number used."""
-    return vault.execute_http(service_id, endpoint, method, headers, body, timeout, key_number)
+    return vault.execute_http(
+        service_id, endpoint, method, headers, body, timeout, key_number, key_tag
+    )
+
+
+@tool(description="Inspect credential service details, masked keys, health, and key tags.")
+def orquestra_vault_inspect(service_id: str) -> dict[str, Any]:
+    """Inspect service metadata and key pool without revealing secrets."""
+    return vault.inspect_service(service_id)
+
+
+@tool(description="Advance the active key pointer or rotate a specific key in the pool.")
+def orquestra_vault_rotate(
+    service_id: str, next_key: bool = True, key_number: int | None = None
+) -> dict[str, Any]:
+    """Rotate keys in pool or advance active pointer."""
+    return vault.rotate_key(service_id, next_key=next_key, key_number=key_number)
+
+
+@tool(description="Test connection and latency to provider verify endpoint.")
+def orquestra_vault_test(
+    service_id: str, key_number: int | None = None
+) -> dict[str, Any]:
+    """Ping provider endpoint and persist updated health."""
+    return vault.test_service(service_id, key_number=key_number)
+
+
+@tool(description="List built-in provider presets (headers, env vars, metadata).")
+def orquestra_vault_presets() -> list[dict[str, Any]]:
+    """List provider credential templates."""
+    return vault.list_vault_presets()
+
+
+@tool(description="Audit vault at-rest encryption, 0600 file permissions, and backups.")
+def orquestra_vault_audit() -> dict[str, Any]:
+    """Audit security posture of local vault storage."""
+    return vault.audit_vault()
 
 
 @tool(
