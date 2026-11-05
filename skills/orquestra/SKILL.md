@@ -27,6 +27,12 @@ All configurations, skills, and presets are centrally managed under `~/.orquestr
 - **Harness Scope:** Skills projected exclusively to specific harnesses (e.g., `active/antigravity/`, `active/codex/`).
 - **Compiled Configs:** Each harness configuration file (e.g., `mcp_config.json`, `opencode.jsonc`, `claude.json`) is an outward projection compiled directly from `mcps.json`.
 
+### Harness skill ownership
+
+- The bridge imports existing harness skills into the Orquestra vault, backs up native files before replacing them, and leaves harness-facing skill paths as symlinks into the managed projection.
+- Freebuff's canonical global skill path is `~/.agents/skills`; legacy Freebuff/Manicode locations are linked only when their parent directories already exist.
+- Treat project-local `.agents/skills` as project-owned content. It is not part of the global Freebuff inventory and must not be adopted into the user vault automatically.
+
 ## 2. Interaction Protocol & CLI Reference
 
 When shell interaction is required or MCP tools are unavailable, use the native `orquestra` CLI binary. Always prefix commands with `rtk` to condense terminal output:
