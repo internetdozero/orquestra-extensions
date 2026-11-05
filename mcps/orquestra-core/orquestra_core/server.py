@@ -31,6 +31,9 @@ orquestra_append_mission_rule appends a scoped directive with a backup.
 Vault: orquestra_vault_list shows credential services with masked keys,
 orquestra_vault_http / orquestra_vault_exec spend a stored key blind, and
 orquestra_vault_set_enabled flips the kill-switch the proxy enforces.
+Before a credentialed request, ask whether the operator prefers a specific
+key number or the active default when no preference is already stated. Reuse
+that choice for the task; never request or expose the secret itself.
 
 Fleet: orquestra_fleet_status reports the link state of every harness.
 orquestra_deploy_bridge runs headless bridge fusion: backs up and symlinks
@@ -216,7 +219,10 @@ def orquestra_delete_mcp(mcp_id: str) -> dict[str, Any]:
 
 
 @tool(
-    description="List all credential services in Orquestra Vault with health and masked keys. Zero secrets returned."
+    description=(
+        "List credential services, masked keys in 1-based order, the active key "
+        "number, and health. Secrets are never returned."
+    )
 )
 def orquestra_vault_list() -> list[dict[str, Any]]:
     """Inspect configured API services and key pools without exposing any secret."""
@@ -224,7 +230,14 @@ def orquestra_vault_list() -> list[dict[str, Any]]:
 
 
 @tool(
-    description="Execute blind HTTP request using a stored service credential. The secret is injected in memory and scrubbed from responses."
+    description=(
+        "Execute a blind HTTP request with a stored credential. Ask whether the "
+        "operator prefers a key number or the active default unless already stated. "
+        "Pass key_number (1-based) to pin one key; omit it for the default. "
+        "A pinned request uses only that key and never changes the default. "
+        "Reuse the same choice for related calls. The secret stays in memory and "
+        "is scrubbed from responses."
+    )
 )
 def orquestra_vault_http(
     service_id: str,
@@ -233,21 +246,29 @@ def orquestra_vault_http(
     headers: dict[str, str] | None = None,
     body: Any | None = None,
     timeout: float = 30.0,
+    key_number: int | None = None,
 ) -> dict[str, Any]:
-    """service_id: e.g. 'inception-labs', 'openai', 'github'. Returns status, scrubbed headers, and scrubbed body."""
-    return vault.execute_http(service_id, endpoint, method, headers, body, timeout)
+    """Returns status and scrubbed response; reports the one-based key number used."""
+    return vault.execute_http(service_id, endpoint, method, headers, body, timeout, key_number)
 
 
 @tool(
-    description="Execute CLI command with stored service credentials injected into environment in memory. Output is scrubbed."
+    description=(
+        "Execute an allowlisted CLI command with a stored credential injected "
+        "in memory. Ask whether the operator prefers a key number or the active "
+        "default unless already stated. Pass key_number (1-based) to pin one key; "
+        "omit it for the default. A pinned command uses only that key and never "
+        "changes the default. Reuse the same choice for related calls. Output is scrubbed."
+    )
 )
 def orquestra_vault_exec(
     service_id: str,
     command: list[str] | str,
     timeout: float = 60.0,
+    key_number: int | None = None,
 ) -> dict[str, Any]:
-    """service_id: e.g. 'github', 'cloudflare', 'inception-labs'. Command runs with secret in env, output scrubbed."""
-    return vault.execute_exec(service_id, command, timeout)
+    """Command runs with selected secret in env; returns scrubbed output and key number used."""
+    return vault.execute_exec(service_id, command, timeout, key_number)
 
 
 @tool(

@@ -85,6 +85,7 @@ def vault_http(
     headers_json: str | None = None,
     body: str | None = None,
     key_tag: str | None = None,
+    key_number: int | None = None,
 ) -> dict[str, Any]:
     """Blind HTTP with the stored credential injected inside the binary."""
     argv = [
@@ -100,15 +101,25 @@ def vault_http(
         argv += ["--body", body]
     if key_tag is not None:
         argv += ["--key-tag", key_tag]
+    if key_number is not None:
+        argv += ["--key-number", str(key_number)]
     report = _json(run(*argv), f"vault http {service}")
     if not isinstance(report, dict):
         raise BridgeError("vault http did not return a result object")
     return report
 
 
-def vault_exec(service: str, command: list[str]) -> dict[str, Any]:
+def vault_exec(
+    service: str,
+    command: list[str],
+    key_number: int | None = None,
+) -> dict[str, Any]:
     """CLI command with stored credentials injected in memory by the binary."""
-    report = _json(run("vault", "exec", service, "--", *command), f"vault exec {service}")
+    argv = ["vault", "exec", service]
+    if key_number is not None:
+        argv += ["--key-number", str(key_number)]
+    argv += ["--", *command]
+    report = _json(run(*argv), f"vault exec {service}")
     if not isinstance(report, dict):
         raise BridgeError("vault exec did not return a result object")
     return report

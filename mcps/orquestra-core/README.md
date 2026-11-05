@@ -142,11 +142,19 @@ If `orquestra-core` is not on `PATH`, use
 | `orquestra_apply_preset` | `preset_id` | `{preset, applied, changed[], errors[]}` |
 | `orquestra_save_preset` | `name`, `description?`, `skills?`, `mcps?`, `icon?` | `{id, name, description, skills[], mcps[], icon, builtin: false, ...}` |
 | `orquestra_delete_preset` | `preset_id` | `{id, deleted, message}` (built-ins are protected) |
-| `orquestra_vault_list` | — | `[{id, label, enabled, health, totalKeys, maskedKeys[], ...}]` (camelCase, as the binary emits), no secrets |
-| `orquestra_vault_http` | `service_id`, `endpoint`, `method?`, `headers?`, `body?` | `{status, headers, body, usedKeyIndex}`, scrubbed |
-| `orquestra_vault_exec` | `service_id`, `command`, `timeout?` | `{code, stdout, stderr, usedKeyIndex}`, scrubbed |
+| `orquestra_vault_list` | — | `[{id, label, enabled, health, totalKeys, maskedKeys[], activeKeyNumber, ...}]`, no secrets |
+| `orquestra_vault_http` | `service_id`, `endpoint`, `method?`, `headers?`, `body?`, `key_number?` | `{status, headers, body, usedKeyNumber}`, scrubbed |
+| `orquestra_vault_exec` | `service_id`, `command`, `timeout?`, `key_number?` | `{code, stdout, stderr, usedKeyNumber}`, scrubbed |
 | `orquestra_vault_set_enabled` | `service_id`, `enabled` | `{id, label, enabled, ...}`, no secrets |
 | `orquestra_deploy_bridge` | — | `{deployed, harnesses[], errors[]}` |
+
+`key_number` is one-based and follows the order of `maskedKeys` (so `5` means
+key `#5`). Before a credentialed request, ask whether the operator prefers a
+key number or the active default unless the current task already states a
+preference. Reuse that choice for related calls. Pinning uses only the chosen
+key, does not fail over to another key, and does not change the active default.
+The credential itself remains in the native backend's memory and never reaches
+the model; `usedKeyNumber` reports which key the backend used.
 
 `scope` is `global` or a harness id discovered from `~/.orquestra/active`
 (`antigravity`, `claude`, `codex`, `copilot`, `freebuff`, `grok`, `hermes`,

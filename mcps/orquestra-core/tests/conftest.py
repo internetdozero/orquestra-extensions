@@ -89,8 +89,8 @@ elif args == ["--bridge-deploy"]:
 elif args[:2] == ["vault", "list"]:
     print(json.dumps([{\
         "id": "svc-a", "label": "Service A", "preset": "github", \
-        "enabled": True, "total_keys": 1, "masked_keys": ["gh****"], \
-        "health": "ok", "key_health": [], "active_key_index": 0}]))
+        "enabled": True, "totalKeys": 5, "maskedKeys": ["gh****"] * 5, \
+        "health": "ok", "keyHealth": [], "activeKeyIndex": 0}]))
 elif args[:2] == ["vault", "http"]:
     opts = dict(zip(args[2::2], args[3::2]))
     service = opts.get("--service", "")
@@ -101,14 +101,16 @@ elif args[:2] == ["vault", "http"]:
     if method not in ("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"):
         print(f"unsupported HTTP method: {method}", file=sys.stderr)
         sys.exit(1)
-    print(json.dumps({"status": 200, "headers": {}, "body": "ok", "used_key_index": 0}))
+    used_key_index = int(opts.get("--key-number", "1")) - 1
+    print(json.dumps({"status": 200, "headers": {}, "body": "ok", "usedKeyIndex": used_key_index}))
 elif args[:2] == ["vault", "exec"]:
     rest = [a for a in args[2:] if a != "--"]
     service = rest[0] if rest else ""
     if service != "svc-a":
         print(f"unknown vault service: {service}", file=sys.stderr)
         sys.exit(1)
-    print(json.dumps({"code": 0, "stdout": "", "stderr": "", "used_key_index": 0}))
+    key_number = rest[rest.index("--key-number") + 1] if "--key-number" in rest else "1"
+    print(json.dumps({"code": 0, "stdout": "", "stderr": "", "usedKeyIndex": int(key_number) - 1}))
 elif args[:2] == ["vault", "set-enabled"]:
     service = args[2] if len(args) > 2 else ""
     state = args[3] if len(args) > 3 else ""

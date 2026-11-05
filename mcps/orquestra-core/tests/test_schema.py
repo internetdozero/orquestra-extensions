@@ -27,6 +27,12 @@ def test_http_method_schema_publishes_the_enum() -> None:
     assert method["enum"] == list(get_args(HttpMethod))
 
 
+def test_vault_http_publishes_optional_one_based_key_number() -> None:
+    schema = _schema("orquestra_vault_http")
+    assert schema["properties"]["key_number"]["type"] == "integer"
+    assert "key_number" not in schema.get("required", [])
+
+
 def test_invalid_http_method_names_the_options() -> None:
     with pytest.raises(ToolError) as caught:
         _call(
@@ -71,6 +77,7 @@ def test_vault_tools_roundtrip_through_the_binary(mock_home: Path) -> None:
     if isinstance(rows, dict):  # list results arrive wrapped in {"result": [...]}
         rows = rows["result"]
     assert [row["id"] for row in rows] == ["svc-a"]
+    assert rows[0]["activeKeyNumber"] == 1
     assert all("secret" not in json.dumps(row).lower() for row in rows)
 
     http = _call(
@@ -78,18 +85,33 @@ def test_vault_tools_roundtrip_through_the_binary(mock_home: Path) -> None:
         service_id="svc-a",
         endpoint="https://api.example.com/ping",
         method="GET",
+        key_number=5,
     )
     assert http.is_error is False
     assert http.structured_content["status"] == 200
+    assert http.structured_content["usedKeyNumber"] == 5
 
-    executed = _call("orquestra_vault_exec", service_id="svc-a", command=["true"])
+    executed = _call(
+        "orquestra_vault_exec", service_id="svc-a", command=["true"], key_number=5
+    )
     assert executed.is_error is False
     assert executed.structured_content["code"] == 0
+    assert executed.structured_content["usedKeyNumber"] == 5
 
     # String form is shlex-split, never shelled: same argv shape reaches the binary.
     as_string = _call("orquestra_vault_exec", service_id="svc-a", command="true")
     assert as_string.is_error is False
     assert as_string.structured_content["code"] == 0
+    assert as_string.structured_content["usedKeyNumber"] == 1
+
+
+def test_vault_rejects_zero_or_non_integer_key_numbers() -> None:
+    from orquestra_core import vault
+    from orquestra_core.errors import VaultRequestError
+
+    for value in (0, -1, True, "5"):
+        with pytest.raises(VaultRequestError, match="key_number must be a positive 1-based integer"):
+            vault._validate_key_number(value)  # type: ignore[arg-type]
 
 
 def test_vault_set_enabled_roundtrip(mock_home: Path) -> None:
