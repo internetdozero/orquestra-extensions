@@ -48,7 +48,20 @@ Prompt estruturado abaixo pronto para despacho à Builder AI.
 
 ---
 
-## 3. Post-Build Audit Checklist
+## 3. Idea Vault & Blackboard Tooling Protocol
+
+| Phase | Recommended MCP Call | Purpose |
+| --- | --- | --- |
+| **Discovery** | `list_projects()` / `search_ideas(query="...", project="...")` | Inspect existing backlog to avoid duplicating tasks |
+| **Inspection** | `get_idea(idea_id=123)` | Read full task description, builder prompt, and acceptance criteria |
+| **Planning** | `record_idea(...)` / `record_ideas_batch(project="...", items=[...])` | Create individual tasks or atomic multi-step work breakdown |
+| **Metrics** | `get_metrics(project="...", weeks=12)` | Track completion rate, velocity, and priority/status distribution |
+| **Handoffs** | `post_board_note(project="...", topic="contract", note="...")` | Post async notes for companion builder or peer agents |
+| **Coordination** | `read_board_notes(...)` / `mark_board_note_read(note_id=...)` | Read and acknowledge cross-agent collaboration messages |
+
+---
+
+## 4. Post-Build Audit Checklist
 
 When Builder concludes:
 1. **Diff:** Check `rtk git diff` / `rtk git status` for scope compliance.

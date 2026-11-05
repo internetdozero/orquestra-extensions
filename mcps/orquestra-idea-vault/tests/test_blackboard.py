@@ -14,6 +14,9 @@ EXPECTED_TOOLS = [
     "record_idea",
     "record_ideas_batch",
     "list_ideas",
+    "get_idea",
+    "list_projects",
+    "get_metrics",
     "search_ideas",
     "update_idea",
     "update_idea_status",
@@ -22,6 +25,9 @@ EXPECTED_TOOLS = [
     "post_board_note",
     "read_board_notes",
     "clear_board_notes",
+    "get_board_note",
+    "mark_board_note_read",
+    "delete_board_note",
 ]
 
 

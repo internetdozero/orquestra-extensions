@@ -23,7 +23,7 @@ from .store import MissingIdea
 F = TypeVar("F", bound=Callable[..., Any])
 
 # Failures the caller can act on: bad input, missing rows, storage trouble.
-ANTICIPATED = (ValueError, MissingIdea, sqlite3.Error)
+ANTICIPATED = (ValueError, MissingIdea, LookupError, sqlite3.Error)
 
 
 def actionable(fn: F) -> F:

@@ -103,4 +103,48 @@ def clear_board_notes(
     }
 
 
-__all__ = ["post_board_note", "read_board_notes", "clear_board_notes"]
+def get_board_note(conn: sqlite3.Connection, note_id: int) -> dict[str, Any]:
+    """Fetch an individual blackboard note by ID or raise LookupError."""
+    note_id = int(note_id)
+    row = conn.execute(
+        "SELECT * FROM blackboard_notes WHERE id = ?", (note_id,)
+    ).fetchone()
+    if row is None:
+        raise LookupError(f"blackboard note #{note_id} not found")
+    return note_dict(row)
+
+
+def mark_board_note_read(conn: sqlite3.Connection, note_id: int) -> dict[str, Any]:
+    """Mark an individual note as read and return the updated note."""
+    note_id = int(note_id)
+    cursor = conn.execute(
+        "UPDATE blackboard_notes SET is_read = 1 WHERE id = ?", (note_id,)
+    )
+    if cursor.rowcount == 0:
+        raise LookupError(f"blackboard note #{note_id} not found")
+    row = conn.execute(
+        "SELECT * FROM blackboard_notes WHERE id = ?", (note_id,)
+    ).fetchone()
+    return note_dict(row)
+
+
+def delete_board_note(conn: sqlite3.Connection, note_id: int) -> dict[str, Any]:
+    """Permanently delete an individual note by ID."""
+    note_id = int(note_id)
+    row = conn.execute(
+        "SELECT * FROM blackboard_notes WHERE id = ?", (note_id,)
+    ).fetchone()
+    if row is None:
+        raise LookupError(f"blackboard note #{note_id} not found")
+    conn.execute("DELETE FROM blackboard_notes WHERE id = ?", (note_id,))
+    return {"id": note_id, "deleted": True, "message": f"Deleted note #{note_id}."}
+
+
+__all__ = [
+    "post_board_note",
+    "read_board_notes",
+    "clear_board_notes",
+    "get_board_note",
+    "mark_board_note_read",
+    "delete_board_note",
+]

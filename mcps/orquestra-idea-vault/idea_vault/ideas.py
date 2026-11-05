@@ -110,6 +110,24 @@ def record_ideas_batch(
     }
 
 
+def get_idea(conn: sqlite3.Connection, idea_id: int) -> dict[str, Any]:
+    """Fetch an idea by ID or raise MissingIdea."""
+    idea_id = int(idea_id)
+    row = conn.execute("SELECT * FROM ideas WHERE id = ?", (idea_id,)).fetchone()
+    if row is None:
+        raise MissingIdea(f"idea #{idea_id} not found")
+    return idea_dict(row)
+
+
+def list_projects(conn: sqlite3.Connection) -> dict[str, Any]:
+    """Return sorted list of distinct project names found in the vault."""
+    rows = conn.execute(
+        "SELECT DISTINCT project FROM ideas WHERE project != '' ORDER BY project"
+    ).fetchall()
+    projects = [row["project"] for row in rows]
+    return {"count": len(projects), "projects": projects}
+
+
 def list_ideas(
     conn: sqlite3.Connection,
     project: str | None = None,
@@ -325,6 +343,8 @@ def export_ideas_markdown(conn: sqlite3.Connection, project: str) -> dict[str, A
 __all__ = [
     "record_idea",
     "record_ideas_batch",
+    "get_idea",
+    "list_projects",
     "list_ideas",
     "search_ideas",
     "update_idea",

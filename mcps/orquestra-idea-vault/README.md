@@ -110,13 +110,22 @@ If `idea-vault` is not on `PATH`, use
 
 | Tool | Inputs | Returns |
 | --- | --- | --- |
-| `record_idea` | `project`, `title`, `description?`, `category?`, `priority?`, `tags?` | Stored idea with `id` and a confirmation message |
-| `list_ideas` | `project?`, `status?` (default `open`), `category?`, `priority?` | `{count, status, ideas[]}` ordered by priority |
-| `search_ideas` | `query`, `project?` | `{query, count, ideas[]}` matching title, description or tags |
+| `record_idea` | `project`, `title`, `description?`, `category?`, `priority?`, `tags?`, `prompt?` | Stored idea with `id` and a confirmation message |
+| `record_ideas_batch` | `project`, `items[]` | `{count, project, ideas[], message}` atomic batch creation |
+| `get_idea` | `idea_id` | Single idea object with complete metadata, or not-found error |
+| `list_projects` | None | `{count, projects[]}` sorted distinct project names |
+| `list_ideas` | `project?`, `status?` (default `open`), `category?`, `priority?`, `limit?`, `offset?`, `compact?` | `{count, status, ideas[]}` ordered by priority |
+| `search_ideas` | `query`, `project?` | `{query, count, ideas[]}` matching title, description, tags, or prompt |
+| `update_idea` | `idea_id`, `title?`, `description?`, `category?`, `priority?`, `tags?`, `prompt?` | Updated idea record |
 | `update_idea_status` | `idea_id`, `status` | Updated idea, or a not-found error |
+| `delete_idea` | `idea_id` | `{id, deleted: true, message}` permanently deletes idea |
+| `get_metrics` | `project?`, `weeks?` (default 12) | Completion velocity, status/category/priority distributions, and completion rate |
 | `export_ideas_markdown` | `project` | `{project, count, markdown}` grouped by category |
 | `post_board_note` | `project`, `topic`, `note`, `sender?`, `target?` | Stored note with `id` |
 | `read_board_notes` | `project`, `topic?`, `unread_only?`, `mark_as_read?`, `target?` | `{count, notes[]}` |
+| `get_board_note` | `note_id` | Single blackboard note by ID, or not-found error |
+| `mark_board_note_read` | `note_id` | Updated note with `is_read = true` |
+| `delete_board_note` | `note_id` | `{id, deleted: true, message}` permanently deletes note |
 | `clear_board_notes` | `project`, `topic?`, `include_unread?` | `{deleted, scope, message}` |
 
 Allowed values: `category` is `feature`, `architecture`, `bug`, `ux` or `idea`;

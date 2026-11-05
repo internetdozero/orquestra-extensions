@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from mcp.server.mcpserver import MCPServer
 
-from . import blackboard, ideas
+from . import blackboard, ideas, metrics
 from .errors import actionable
 from .schema import (
     BuilderDispatch,
@@ -107,6 +107,29 @@ def list_ideas(
             offset=offset,
             compact=compact,
         )
+
+
+@tool(description="Fetch an individual idea by its numeric ID.")
+def get_idea(idea_id: int) -> dict[str, Any]:
+    """Fetch complete details of one idea by ID or fail with an actionable error."""
+    with get_database() as conn:
+        return ideas.get_idea(conn, idea_id)
+
+
+@tool(description="List distinct project names that have recorded ideas in the vault.")
+def list_projects() -> dict[str, Any]:
+    """Return sorted list of unique projects."""
+    with get_database() as conn:
+        return ideas.list_projects(conn)
+
+
+@tool(
+    description="Compute developer velocity, status/category breakdowns, and delivery metrics."
+)
+def get_metrics(project: str | None = None, weeks: int = 12) -> dict[str, Any]:
+    """Calculate velocity, completion rates, and distributions, optionally filtered by project."""
+    with get_database() as conn:
+        return metrics.get_metrics(conn, project=project, weeks=weeks)
 
 
 @tool(
@@ -208,6 +231,27 @@ def clear_board_notes(
     """Clean up resolved notes for a project, optionally scoped to one topic."""
     with get_database() as conn:
         return blackboard.clear_board_notes(conn, project, topic, include_unread)
+
+
+@tool(description="Fetch an individual blackboard note by its numeric ID.")
+def get_board_note(note_id: int) -> dict[str, Any]:
+    """Fetch full note details by note ID or fail with an actionable error."""
+    with get_database() as conn:
+        return blackboard.get_board_note(conn, note_id)
+
+
+@tool(description="Mark an individual blackboard note as read by its numeric ID.")
+def mark_board_note_read(note_id: int) -> dict[str, Any]:
+    """Mark a single note as read and return its updated state."""
+    with get_database() as conn:
+        return blackboard.mark_board_note_read(conn, note_id)
+
+
+@tool(description="Permanently delete an individual blackboard note by its numeric ID.")
+def delete_board_note(note_id: int) -> dict[str, Any]:
+    """Delete a single blackboard note."""
+    with get_database() as conn:
+        return blackboard.delete_board_note(conn, note_id)
 
 
 def main(argv: list[str] | None = None) -> int:
