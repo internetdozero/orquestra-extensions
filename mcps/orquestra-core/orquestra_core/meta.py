@@ -5,8 +5,15 @@ from __future__ import annotations
 INSTRUCTIONS = """Control plane for the OrquestraAI harness fleet on this machine.
 
 Skills: orquestra_list_skills shows the vault and which scopes project each
-skill, orquestra_enable_skill / orquestra_disable_skill flip the symlinks the
+skill (with optional filter_text, official_only, and has_scripts_only),
+orquestra_enable_skill / orquestra_disable_skill flip the symlinks the
 harnesses read (a global change fans out to every harness scope).
+Granular skills: orquestra_inspect_skill inspects metadata, scripts, and projection matrix,
+orquestra_validate_skill audits SKILL.md frontmatter and directory security limits,
+orquestra_get_skill_content / orquestra_set_skill_content read and write SKILL.md manifests atomically,
+orquestra_skills_summary reports fleet-wide active/total skills per scope,
+orquestra_batch_skills bulk enables or disables all skills for a scope, and
+orquestra_import_skill imports skills from local directories or git repositories.
 
 MCP servers: orquestra_list_mcps reads the catalog, orquestra_toggle_mcp flips
 one server and recompiles every harness config through the native binary.

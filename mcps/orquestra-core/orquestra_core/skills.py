@@ -136,7 +136,12 @@ def _targets(scope: str) -> list[str]:
     return [scope]
 
 
-def list_skills(scope: str = paths.GLOBAL_SCOPE) -> list[dict[str, Any]]:
+def list_skills(
+    scope: str = paths.GLOBAL_SCOPE,
+    filter_text: str | None = None,
+    official_only: bool = False,
+    has_scripts_only: bool = False,
+) -> list[dict[str, Any]]:
     """Describe every vault skill and whether this scope currently projects it."""
     name = (scope or paths.GLOBAL_SCOPE).strip()
     paths.active_scope(name)  # validates the scope before touching the vault
@@ -144,12 +149,38 @@ def list_skills(scope: str = paths.GLOBAL_SCOPE) -> list[dict[str, Any]]:
     if not library.is_dir():
         raise ValueError(f"skill library not found at {library}")
     rows: list[dict[str, Any]] = []
+    clean_filter = (filter_text or "").strip().lower()
+
     for entry in sorted(library.iterdir(), key=lambda item: item.name):
         manifest = entry / "SKILL.md"
         if not manifest.is_file():
             continue
         meta = _meta(manifest)
         inherited = name != paths.GLOBAL_SCOPE and _present(paths.GLOBAL_SCOPE, entry.name)
+
+        scripts_dir = entry / "scripts"
+        script_files = (
+            [
+                f.name
+                for f in sorted(scripts_dir.iterdir())
+                if f.is_file() and not f.name.startswith(".")
+            ]
+            if scripts_dir.is_dir()
+            else []
+        )
+        has_scripts = bool(script_files)
+
+        if has_scripts_only and not has_scripts:
+            continue
+        if official_only and not entry.name.startswith("orquestra"):
+            continue
+        if clean_filter and not (
+            clean_filter in entry.name.lower()
+            or clean_filter in meta.name.lower()
+            or clean_filter in meta.description.lower()
+        ):
+            continue
+
         rows.append(
             {
                 "id": entry.name,
@@ -158,9 +189,153 @@ def list_skills(scope: str = paths.GLOBAL_SCOPE) -> list[dict[str, Any]]:
                 "tokens": meta.tokens,
                 "enabled": _present(name, entry.name),
                 "is_inherited": inherited,
+                "has_scripts": has_scripts,
+                "script_files": script_files,
             }
         )
     return rows
+
+
+def inspect_skill(skill_id: str, scope: str = paths.GLOBAL_SCOPE) -> dict[str, Any]:
+    """Inspect skill metadata, tokens, scripts, and projection status across all scopes."""
+    target = skill_dir(skill_id)
+    manifest = target / "SKILL.md"
+    meta = _meta(manifest)
+    raw_content = manifest.read_text(encoding="utf-8", errors="replace")
+    scripts_dir = target / "scripts"
+    script_files = (
+        [
+            f.name
+            for f in sorted(scripts_dir.iterdir())
+            if f.is_file() and not f.name.startswith(".")
+        ]
+        if scripts_dir.is_dir()
+        else []
+    )
+    all_scopes = [paths.GLOBAL_SCOPE, *paths.harness_ids()]
+    projection_matrix = {
+        s: {
+            "enabled": _present(s, target.name),
+            "is_inherited": s != paths.GLOBAL_SCOPE and _present(paths.GLOBAL_SCOPE, target.name),
+            "link_path": str(_link_path(s, target.name)),
+        }
+        for s in all_scopes
+    }
+    return {
+        "id": target.name,
+        "name": meta.name,
+        "description": meta.description,
+        "tokens": meta.tokens,
+        "bytes": len(raw_content.encode("utf-8")),
+        "has_scripts": bool(script_files),
+        "scripts": script_files,
+        "active_in_scope": _present(scope, target.name),
+        "scope": scope,
+        "scopes": projection_matrix,
+        "path": str(manifest),
+    }
+
+
+def get_skill_content(skill_id: str) -> dict[str, Any]:
+    """Return raw SKILL.md markdown text from the vault."""
+    target = skill_dir(skill_id)
+    manifest = target / "SKILL.md"
+    content = manifest.read_text(encoding="utf-8")
+    return {
+        "id": target.name,
+        "content": content,
+        "tokens": estimate_tokens(content),
+        "bytes": len(content.encode("utf-8")),
+    }
+
+
+def set_skill_content(skill_id: str, content: str) -> dict[str, Any]:
+    """Atomically validate and update SKILL.md in the vault."""
+    if not (content or "").strip():
+        raise ValueError("content must not be empty")
+    fields = _frontmatter(content)
+    name = fields.get("name")
+    description = fields.get("description")
+    if not name or not description:
+        raise ValueError("content must declare 'name' and 'description' in YAML frontmatter")
+
+    target = skill_dir(skill_id)
+    manifest = target / "SKILL.md"
+    temporary = manifest.with_name(f".SKILL.md.tmp-{os.getpid()}")
+    try:
+        temporary.write_text(content, encoding="utf-8")
+        os.replace(temporary, manifest)
+    finally:
+        if os.path.lexists(temporary):
+            os.unlink(temporary)
+
+    clear_cache()
+    meta = _meta(manifest)
+    return {
+        "id": target.name,
+        "name": meta.name,
+        "description": meta.description,
+        "written": True,
+        "tokens": meta.tokens,
+        "bytes": len(content.encode("utf-8")),
+    }
+
+
+def skills_summary() -> dict[str, Any]:
+    """Return active and total skill counts per scope across the fleet."""
+    library = paths.skills_library()
+    if not library.is_dir():
+        return {"total_skills": 0, "scopes": {}}
+    skill_names = [
+        item.name
+        for item in library.iterdir()
+        if item.is_dir() and (item / "SKILL.md").is_file()
+    ]
+    total = len(skill_names)
+    all_scopes = [paths.GLOBAL_SCOPE, *paths.harness_ids()]
+    scopes_report: dict[str, dict[str, Any]] = {}
+    for scope in all_scopes:
+        active_count = sum(1 for name in skill_names if _present(scope, name))
+        scopes_report[scope] = {
+            "active": active_count,
+            "total": total,
+        }
+    return {
+        "total_skills": total,
+        "scopes": scopes_report,
+    }
+
+
+def batch_skills(action: str, scope: str = paths.GLOBAL_SCOPE) -> dict[str, Any]:
+    """Bulk enable or disable all vault skills for a scope."""
+    act = (action or "").strip().lower()
+    if act not in ("enable", "disable"):
+        raise ValueError("action must be 'enable' or 'disable'")
+    name = (scope or paths.GLOBAL_SCOPE).strip()
+    paths.active_scope(name)
+    library = paths.skills_library()
+    if not library.is_dir():
+        return {"action": act, "scope": name, "changed": [], "count": 0}
+
+    changed: list[str] = []
+    for entry in sorted(library.iterdir(), key=lambda item: item.name):
+        if not entry.is_dir() or not (entry / "SKILL.md").is_file():
+            continue
+        if act == "enable":
+            for s in _targets(name):
+                if _ensure_link(s, entry.name, entry):
+                    changed.append(f"{s}:{entry.name}")
+        else:
+            for s in _targets(name):
+                if _drop_link(s, entry.name):
+                    changed.append(f"{s}:{entry.name}")
+
+    return {
+        "action": act,
+        "scope": name,
+        "count": len(changed),
+        "changed": changed,
+    }
 
 
 def enable_skill(skill_id: str, scope: str = paths.GLOBAL_SCOPE) -> dict[str, Any]:
@@ -179,10 +354,13 @@ def enable_skill(skill_id: str, scope: str = paths.GLOBAL_SCOPE) -> dict[str, An
     }
 
 
-def disable_skill(skill_id: str, scope: str = paths.GLOBAL_SCOPE) -> dict[str, Any]:
+def disable_skill(
+    skill_id: str, scope: str = paths.GLOBAL_SCOPE, force: bool = False
+) -> dict[str, Any]:
     """Remove a skill from a scope, fanning out to every harness for `global`."""
     name = (scope or paths.GLOBAL_SCOPE).strip()
     target = skill_dir(skill_id)
+    inherited = name != paths.GLOBAL_SCOPE and _present(paths.GLOBAL_SCOPE, target.name)
     removed = [s for s in _targets(name) if _drop_link(s, target.name)]
     meta = _meta(target / "SKILL.md")
     return {
@@ -192,4 +370,5 @@ def disable_skill(skill_id: str, scope: str = paths.GLOBAL_SCOPE) -> dict[str, A
         "removed": removed,
         "scopes": _targets(name),
         "tokens_saved": meta.tokens if removed else 0,
+        "inherited_from_global": inherited,
     }

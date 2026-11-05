@@ -126,9 +126,16 @@ If `orquestra-core` is not on `PATH`, use
 
 | Tool | Inputs | Returns |
 | --- | --- | --- |
-| `orquestra_list_skills` | `scope?` (default `global`) | `[{id, name, description, tokens, enabled, is_inherited}]` |
+| `orquestra_list_skills` | `scope?`, `filter_text?`, `official_only?`, `has_scripts_only?` | `[{id, name, description, tokens, enabled, is_inherited, has_scripts, script_files[]}]` |
+| `orquestra_inspect_skill` | `skill_id`, `scope?` | `{id, name, description, tokens, bytes, has_scripts, scripts[], active_in_scope, scopes{}}` |
 | `orquestra_enable_skill` | `skill_id`, `scope?` | `{id, scope, enabled, changed[], scopes[], tokens, path}` |
-| `orquestra_disable_skill` | `skill_id`, `scope?` | `{id, scope, enabled, removed[], scopes[], tokens_saved}` |
+| `orquestra_disable_skill` | `skill_id`, `scope?` | `{id, scope, enabled, removed[], scopes[], tokens_saved, inherited_from_global}` |
+| `orquestra_batch_skills` | `action`, `scope?` | `{action, scope, count, changed[]}` |
+| `orquestra_skills_summary` | — | `{total_skills, scopes: {<scope>: {active, total}}}` |
+| `orquestra_validate_skill` | `target` | `{id, valid, name, description, path, file_count, max_depth, tokens}` |
+| `orquestra_get_skill_content` | `skill_id` | `{id, content, tokens, bytes}` |
+| `orquestra_set_skill_content` | `skill_id`, `content` | `{id, name, description, written: true, tokens, bytes}` |
+| `orquestra_import_skill` | `source`, `subpath?`, `scope?`, `enable?` | `{id, imported: true, enabled, path, tokens, files[]}` |
 | `orquestra_list_mcps` | — | `[{id, name, description, command, args, globalEnabled, enabledHarnesses}]` |
 | `orquestra_toggle_mcp` | `mcp_id`, `scope?`, `enabled?` | `{id, scope, enabled, changed[], targets, servers, backup, globalEnabled, enabledHarnesses}` |
 | `orquestra_read_instructions` | — | master `AGENTS.md` as text |

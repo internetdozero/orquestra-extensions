@@ -8,7 +8,7 @@ from typing import Any, Callable
 
 from mcp.server.mcpserver import MCPServer
 
-from . import catalog, catalog_admin, fleet, instructions, mcp_control, paths, presets, skill_admin, skills, vault
+from . import catalog, catalog_admin, fleet, instructions, mcp_control, paths, presets, skill_admin, skill_tools, skills, vault
 from .errors import actionable
 from .meta import INSTRUCTIONS
 from .schema import HttpMethod
@@ -27,11 +27,16 @@ def tool(*, description: str) -> Callable[[Callable[..., Any]], Any]:
 
 
 @tool(
-    description="List every skill in the vault with token weight and whether a scope projects it."
+    description="List skills in the vault with token weight, projection status, and optional filtering."
 )
-def orquestra_list_skills(scope: str = "global") -> list[dict[str, Any]]:
+def orquestra_list_skills(
+    scope: str = "global",
+    filter_text: str | None = None,
+    official_only: bool = False,
+    has_scripts_only: bool = False,
+) -> list[dict[str, Any]]:
     """scope: 'global' or a harness id such as codex, claude, grok."""
-    return skills.list_skills(scope)
+    return skills.list_skills(scope, filter_text, official_only, has_scripts_only)
 
 
 @tool(
@@ -334,6 +339,10 @@ def orquestra_vault_exec(
 def orquestra_vault_set_enabled(service_id: str, enabled: bool) -> dict[str, Any]:
     """service_id: e.g. 'github'. Returns the service with its new enabled state; no secrets."""
     return vault.set_service_enabled(service_id, enabled)
+
+
+# Register granular skill administration and introspection tools
+skill_tools.register_skill_tools(server)
 
 
 def main(argv: list[str] | None = None) -> int:

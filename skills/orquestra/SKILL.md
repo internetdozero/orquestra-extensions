@@ -42,6 +42,20 @@ When shell interaction is required or MCP tools are unavailable, use the native 
 - `rtk orquestra --bridge-deploy`: Back up and link every installed harness into the fleet projection (JSON report).
 - `rtk orquestra --preset <id>`: Apply a mission preset (e.g., `rtk orquestra --preset full-power` or a custom id from `presets.json`).
 
+### Granular Skills Management (`orquestra skills`)
+- `rtk orquestra skills list [--format table|json|wide] [--official] [--has-scripts] [--filter <term>]`: List skills with token counts and projection state.
+- `rtk orquestra skills info <id>`: Comprehensive inspection: tokens, scripts, and projection matrix across all scopes.
+- `rtk orquestra skills enable <id> [--scope <harness>]`: Activate a skill in a scope (`global` projects to all harnesses).
+- `rtk orquestra skills disable <id> [--scope <harness>]`: Deactivate a skill and prune its projection symlink.
+- `rtk orquestra skills batch <enable|disable> [--scope <harness>]`: Bulk enable or disable all vault skills for a scope.
+- `rtk orquestra skills summary [--json]`: Fleet-wide summary of active vs total skill projections per scope.
+- `rtk orquestra skills validate <id|path>`: Validate manifest frontmatter, ID safety, and directory security limits.
+- `rtk orquestra skills create <id> --name <name> --desc <text>`: Scaffold a new skill in the master vault.
+- `rtk orquestra skills import <dir|url[#subpath]> [--enable]`: Import and validate a skill from folder or git repo.
+- `rtk orquestra skills export <id> <dest>`: Export skill folder and scripts to a destination directory.
+- `rtk orquestra skills content <id> [--set <file>]`: View or update raw `SKILL.md` manifest in vault.
+- `rtk orquestra skills delete <id> [--yes]`: Safe-archive skill into timestamped backup directory.
+
 ### Granular MCP Management (`orquestra mcp`)
 - `rtk orquestra mcp list [--format table|json|wide]`: Inspect MCP catalog with global and per-harness activation.
 - `rtk orquestra mcp status [--json]`: Fleet-wide MCP metrics, server counts, and harness sync breakdown.
@@ -84,9 +98,16 @@ When shell interaction is required or MCP tools are unavailable, use the native 
 When the `orquestra-core` MCP server is active, prefer calling typed tools over invoking the shell CLI:
 
 ### Skill Management
-- `orquestra_list_skills(scope="global")`: List skills in the vault, token weights, and whether a scope projects them.
+- `orquestra_list_skills(scope="global", filter_text=None, official_only=False, has_scripts_only=False)`: List skills in vault with token weights, projection status, and optional filtering.
+- `orquestra_inspect_skill(skill_id, scope="global")`: Inspect detailed skill metadata, scripts, and per-scope projection matrix.
 - `orquestra_enable_skill(skill_id, scope="global")`: Activate a skill in a scope (`global` propagates the symlink to every harness).
-- `orquestra_disable_skill(skill_id, scope="global")`: Deactivate a skill and prune its projection symlink.
+- `orquestra_disable_skill(skill_id, scope="global")`: Deactivate a skill, prune symlink, and report inherited state.
+- `orquestra_batch_skills(action="enable"|"disable", scope="global")`: Bulk toggle all skills in the vault for a scope.
+- `orquestra_skills_summary()`: Fleet-wide metrics on total skills and active projections per scope.
+- `orquestra_validate_skill(target)`: Audit SKILL.md frontmatter (`name`, `description`), ID safety, and security limits.
+- `orquestra_get_skill_content(skill_id)`: Read raw `SKILL.md` markdown content.
+- `orquestra_set_skill_content(skill_id, content)`: Atomically validate and update `SKILL.md` in the vault.
+- `orquestra_import_skill(source, subpath=None, scope="global", enable=False)`: Import from local directory or git URL (`url#subpath`).
 - `orquestra_create_skill(skill_id, name, description, instructions_markdown, scripts=None)`: Author a new skill in `skills-library/<id>/SKILL.md` with optional helper scripts.
 - `orquestra_delete_skill(skill_id)`: Safe-archive a skill: unlinks from all scopes and moves the vault folder to `backups/deleted-skills-<stamp>/`.
 

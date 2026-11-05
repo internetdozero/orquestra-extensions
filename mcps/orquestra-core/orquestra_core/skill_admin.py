@@ -117,3 +117,151 @@ def delete_skill(skill_id: str) -> dict[str, Any]:
         "unlinked": unlinked,
         "backup": str(destination),
     }
+
+
+def validate_skill(target: str) -> dict[str, Any]:
+    """Validate directory structure, SKILL.md frontmatter, ID safety, and security limits."""
+    raw = (target or "").strip()
+    if not raw:
+        raise ValueError("target must not be empty")
+
+    path = (
+        Path(raw).expanduser().resolve()
+        if Path(raw).exists()
+        else paths.skills_library() / raw
+    )
+    if not path.is_dir():
+        raise ValueError(f"skill directory not found at {path}")
+
+    skill_id = path.name
+    if (
+        skill_id.startswith(".")
+        or ".." in skill_id
+        or "/" in skill_id
+        or "\\" in skill_id
+    ):
+        raise ValueError(f"invalid skill id or directory name '{skill_id}'")
+
+    manifest = path / "SKILL.md"
+    if not manifest.is_file():
+        raise ValueError(f"missing SKILL.md manifest at {path}")
+
+    text = manifest.read_text(encoding="utf-8", errors="replace")
+    fields = skills._frontmatter(text)
+    name = fields.get("name")
+    description = fields.get("description")
+    errors: list[str] = []
+    if not name:
+        errors.append("frontmatter missing required field 'name'")
+    if not description:
+        errors.append("frontmatter missing required field 'description'")
+
+    file_count = 0
+    max_depth = 0
+    for root, dirs, files in os.walk(path):
+        rel = Path(root).relative_to(path)
+        depth = len(rel.parts)
+        if depth > max_depth:
+            max_depth = depth
+        if max_depth >= 4:
+            errors.append(
+                f"directory depth exceeds maximum limit of 4 (found depth {max_depth})"
+            )
+            break
+        file_count += len(files)
+        if file_count >= 500:
+            errors.append(
+                f"file count exceeds maximum limit of 500 (found >= {file_count})"
+            )
+            break
+
+    if errors:
+        raise ValueError(
+            f"skill validation failed for '{skill_id}': " + "; ".join(errors)
+        )
+
+    return {
+        "id": skill_id,
+        "valid": True,
+        "name": name,
+        "description": description,
+        "path": str(path),
+        "file_count": file_count,
+        "max_depth": max_depth,
+        "tokens": skills.estimate_tokens(text),
+    }
+
+
+def import_skill(
+    source: str,
+    subpath: str | None = None,
+    scope: str = paths.GLOBAL_SCOPE,
+    enable: bool = False,
+) -> dict[str, Any]:
+    """Import a skill from a local directory or remote git repo (with url#subpath support)."""
+    clean_src = (source or "").strip()
+    if not clean_src:
+        raise ValueError("source must not be empty")
+
+    if "#" in clean_src and not subpath:
+        clean_src, subpath = clean_src.split("#", 1)
+
+    is_git = (
+        clean_src.startswith("http://")
+        or clean_src.startswith("https://")
+        or clean_src.startswith("git@")
+        or clean_src.endswith(".git")
+    )
+
+    temp_clone_dir = None
+    try:
+        if is_git:
+            import subprocess
+            import uuid
+
+            temp_clone_dir = (
+                Path("/var/tmp/testing") / f"skill-import-{uuid.uuid4().hex}"
+            )
+            temp_clone_dir.parent.mkdir(parents=True, exist_ok=True)
+            res = subprocess.run(
+                ["git", "clone", "--depth", "1", clean_src, str(temp_clone_dir)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if res.returncode != 0:
+                raise ValueError(
+                    f"git clone failed: {res.stderr.strip() or res.stdout.strip()}"
+                )
+            src_dir = (
+                temp_clone_dir / subpath if subpath else temp_clone_dir
+            )
+        else:
+            local_path = Path(clean_src).expanduser().resolve()
+            src_dir = local_path / subpath if subpath else local_path
+
+        val = validate_skill(str(src_dir))
+        skill_id = _validate_id(val["id"])
+        dest = paths.skills_library() / skill_id
+        if dest.exists():
+            raise ValueError(f"skill '{skill_id}' already exists in library")
+
+        shutil.copytree(str(src_dir), str(dest))
+        skills.clear_cache()
+
+        enabled_report = None
+        if enable:
+            enabled_report = skills.enable_skill(skill_id, scope=scope)
+
+        return {
+            "id": skill_id,
+            "imported": True,
+            "source": source,
+            "path": str(dest / "SKILL.md"),
+            "enabled": enable,
+            "scope": scope if enable else None,
+            "activation": enabled_report,
+        }
+    finally:
+        if temp_clone_dir and temp_clone_dir.exists():
+            shutil.rmtree(str(temp_clone_dir), ignore_errors=True)
